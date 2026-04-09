@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Учебные планы</title>
+</head>
+<body>
+    <h1>Учебные планы</h1>
+    <a href="/admin/">Перейти в админку</a>
+
+    <table border="1">
+        <tr>
+            <th>Направление</th>
+            <th>Факультет</th>
+            <th>Кафедра</th>
+            <th>Год</th>
+            <th>Статус</th>
+        </tr>
+        {% for plan in plans %}
+        <tr>
+            <td>{{ plan.direction }}</td>
+            <td>{{ plan.faculty }}</td>
+            <td>{{ plan.department }}</td>
+            <td>{{ plan.year_start }}</td>
+            <td>{{ plan.status }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">Планов пока нет</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
