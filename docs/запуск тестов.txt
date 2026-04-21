@@ -1,0 +1,5 @@
+python -m unittest discover tests
+
+ИЛИ
+
+python tests/plx_parse_test.py (для конкретного файла)
