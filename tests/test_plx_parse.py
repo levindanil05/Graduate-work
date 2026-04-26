@@ -54,17 +54,13 @@ class TestPlxParser(unittest.TestCase):
             'department': 'Экономика и предпринимательство',
             'department_code': '24',
             'year_start': '2019',
-            'qualification': 'бакалавр',   # приводим к нижнему регистру, как в парсере
+            'qualification': 'бакалавр', 
             'disciplines': []
         }
-        # Если парсер возвращает 'Бакалавр' с большой буквы, можно сравнивать без учёта регистра:
         self.assertEqual(result['direction'], expected['direction'])
         self.assertEqual(result['qualification'].lower(), expected['qualification'].lower())
-        # или полностью заменить ожидаемое значение на result['qualification'] (но тогда тест будет гибким)
-        # Для простоты давайте сравним словари, но исключим qualification:
         result_copy = result.copy()
         expected_copy = expected.copy()
-        # можно убрать qualification из сравнения или привести к нижнему регистру
         result_copy['qualification'] = result_copy['qualification'].lower()
         expected_copy['qualification'] = expected_copy['qualification'].lower()
         self.assertEqual(result_copy, expected_copy)
@@ -76,6 +72,33 @@ class TestPlxParser(unittest.TestCase):
         self.assertEqual(result['direction'], '')
         self.assertEqual(result['disciplines'], [])
         self.assertTrue(len(result['error']) > 0)
+        
+    def test_real_plx_file1(self):
+        file_path = os.path.join(self.data_dir, "Ucheb_plan_09.03.01_A_VMKSiS_Z_SOKR_MMF_EVM_2020.plx")
+        result = parse_plx_file(file_path)
+
+        self.assertEqual(result['direction'], 'Информатика и вычислительная техника')
+        self.assertEqual(result['direction_code'], '09.03.01')
+        self.assertEqual(result['faculty'].lower(), 'механико-металлургический')
+        self.assertEqual(result['faculty_code'], '-1')
+        self.assertEqual(result['department'], 'Электронно-вычислительные машины и системы')
+        self.assertEqual(result['department_code'], '47')
+        self.assertEqual(result['year_start'], '2020')
+        self.assertIn(result['qualification'], ('бакалавр', '2'))
+
+        self.assertGreater(len(result['disciplines']), 0)
+
+        disc_by_code = {d['code']: d for d in result['disciplines']}
+        expected = {
+            'Б1.О.01': ('Архитектура вычислительных систем', '5'),
+            'Б1.О.02': ('Базы данных', '5'),
+            'Б1.В.01': ('Введение в направление', '2'),
+            'Б1.В.02': ('Вычислительная математика', '3'),
+        }
+        for code, (name, credits) in expected.items():
+            self.assertIn(code, disc_by_code)
+            self.assertEqual(disc_by_code[code]['name'], name)
+            self.assertEqual(disc_by_code[code]['credits'], credits)
 
 if __name__ == "__main__":
     unittest.main()
