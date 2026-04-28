@@ -21,8 +21,8 @@ class TestPlxParser(unittest.TestCase):
             'year_start': '2020',
             'qualification': 'бакалавр',
             'disciplines': [
-                {'name': 'Экономика', 'code': 'Б1.В.01', 'credits': '3'},
-                {'name': 'Экология', 'code': 'Б1.В.02', 'credits': '2'}
+                {'name': 'Экономика', 'code': 'Б1.В.01', 'credits': '3'},  # noqa: RUF001
+                {'name': 'Экология', 'code': 'Б1.В.02', 'credits': '2'}  # noqa: RUF001
             ]
         }
         self.assertEqual(result, expected)
@@ -40,7 +40,7 @@ class TestPlxParser(unittest.TestCase):
             'year_start': '2021',
             'qualification': 'бакалавр',
             'disciplines': [
-                {'name': 'Программирование', 'code': 'Б1.О.01', 'credits': '5'}
+                {'name': 'Программирование', 'code': 'Б1.О.01', 'credits': '5'}  # noqa: RUF001
             ]
         }
         self.assertEqual(result, expected)
@@ -92,15 +92,59 @@ class TestPlxParser(unittest.TestCase):
 
         disc_by_code = {d['code']: d for d in result['disciplines']}
         expected = {
-            'Б1.О.01': ('Архитектура вычислительных систем', '5'),
-            'Б1.О.02': ('Базы данных', '5'),
-            'Б1.В.01': ('Введение в направление', '2'),
-            'Б1.В.02': ('Вычислительная математика', '3'),
+            'Б1.О.01': ('Архитектура вычислительных систем', '5'),  # noqa: RUF001
+            'Б1.О.02': ('Базы данных', '5'),  # noqa: RUF001
+            'Б1.В.01': ('Введение в направление', '2'),  # noqa: RUF001
+            'Б1.В.02': ('Вычислительная математика', '3'),  # noqa: RUF001
         }
         for code, (name, credits) in expected.items():
             self.assertIn(code, disc_by_code)
             self.assertEqual(disc_by_code[code]['name'], name)
             self.assertEqual(disc_by_code[code]['credits'], credits)
+
+    def test_all_userfiles_plx_minimal_fields(self):
+        """
+        Прогоняет парсер по всем реальным .plx в папке userfiles.
+        Тест пропускается, если папка отсутствует/пуста (чтобы не ломать CI).
+        """
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        default_dir = os.path.join(repo_root, "userfiles")
+        plx_dir = os.environ.get("PLX_REAL_DIR", default_dir)
+
+        if not os.path.isdir(plx_dir):
+            self.skipTest(f"Нет папки с реальными PLX: {plx_dir}")  # noqa: RUF001
+
+        plx_files = []
+        for root, _, files in os.walk(plx_dir):
+            for name in files:
+                if name.lower().endswith(".plx"):
+                    plx_files.append(os.path.join(root, name))
+
+        if not plx_files:
+            self.skipTest(f"В папке нет .plx файлов: {plx_dir}")  # noqa: RUF001
+
+        problems = []
+        for path in plx_files:
+            result = parse_plx_file(path)
+            if result.get("error"):
+                problems.append((path, result.get("error")))
+                continue
+
+            # минимальные поля: если в файле они заданы, то в результате ожидаем непустые значения
+            if not result.get("direction_code"):
+                problems.append((path, "empty direction_code"))
+            if not result.get("qualification"):
+                problems.append((path, "empty qualification"))
+            if not result.get("year_start"):
+                problems.append((path, "empty year_start"))
+
+        if problems:
+            msg_lines = [f"{len(problems)} problems out of {len(plx_files)} files:"]
+            for p, err in problems[:30]:
+                msg_lines.append(f"- {p}: {err}")
+            if len(problems) > 30:
+                msg_lines.append(f"... and {len(problems) - 30} more")
+            self.fail("\n".join(msg_lines))
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,6 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/files/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'files')
 
+# Реальные PLX файлы (не копируются в MEDIA_ROOT, читаются напрямую)
+USERFILES_ROOT = BASE_DIR.parent.parent / 'userfiles'
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 

@@ -1,7 +1,50 @@
-# plx_parser.py
+from __future__ import annotations
+
+import re
 import xml.etree.ElementTree as ET
 
 from django.core.files.uploadedfile import UploadedFile
+
+# plx_parser.py
+
+
+_XML_ENCODING_RE = re.compile(br'encoding=[\'"](?P<enc>[^\'"]+)[\'"]', re.IGNORECASE)
+
+
+def _decode_xml_bytes(content: bytes) -> str:
+    """
+    Декодирует XML-байты, пытаясь корректно определить кодировку.
+    PLX часто бывает UTF-16 (LE/BE) с BOM, но на практике встречаются и другие варианты.
+    """
+    m = _XML_ENCODING_RE.search(content[:200])
+    if m:
+        declared = m.group("enc").decode("ascii", errors="ignore").strip()
+        if declared:
+            try:
+                return content.decode(declared)
+            except Exception:
+                pass
+
+    # BOM-aware: python сам поймёт utf-16/utf-8-sig при наличии BOM
+    for enc in ("utf-16", "utf-8-sig", "utf-16-le", "utf-16-be", "utf-8", "cp1251"):
+        try:
+            return content.decode(enc)
+        except Exception:
+            continue
+
+    # Последняя попытка — без падения
+    return content.decode("utf-8", errors="replace")
+
+
+def _nsmap_from_root(root: ET.Element) -> dict:
+    """
+    Возвращает namespace map для поиска, извлекая namespace из тега корня
+    вида {namespace}MMISDB или без namespace.
+    """
+    if root.tag.startswith("{") and "}" in root.tag:
+        ns_uri = root.tag.split("}", 1)[0][1:]
+        return {"ds": ns_uri}
+    return {"ds": "http://tempuri.org/dsMMISDB.xsd"}
 
 
 def parse_plx_file(file) -> dict:
@@ -23,16 +66,15 @@ def parse_plx_file(file) -> dict:
             with open(file, 'rb') as f:
                 content = f.read()
 
-        # Парсим XML (PLX это XML с кодировкой utf-16)
-        root = ET.fromstring(content.decode('utf-16'))
-
-        # Находим namespace
-        ns = {'ds': 'http://tempuri.org/dsMMISDB.xsd'}
+        xml_text = _decode_xml_bytes(content)
+        root = ET.fromstring(xml_text)
+        ns = _nsmap_from_root(root)
 
         result = {
             'direction': '',
             'direction_code': '',
             'faculty': '',
+            'faculty_code': '',
             'department': '',
             'department_code': '',
             'year_start': '',
@@ -87,12 +129,13 @@ def parse_plx_file(file) -> dict:
         return result
 
     except Exception as e:
-        print(f"Ошибка при парсинге PLX: {e}")
         return {
             'direction': '',
             'direction_code': '',
             'faculty': '',
+            'faculty_code': '',
             'department': '',
+            'department_code': '',
             'year_start': '',
             'qualification': '',
             'disciplines': [],

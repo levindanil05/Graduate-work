@@ -1,13 +1,24 @@
-from django.db import models
-import sys
 import os
+import sys
+from pathlib import Path
+
+from django.conf import settings
+from django.db import models
 
 # Добавляем корень проекта в путь для импорта plx_parser
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 class EducationalPlan(models.Model):
-    file = models.FileField(upload_to='files/', verbose_name='Файл плана')
+    # Источник: реальный файл в userfiles (без копирования в MEDIA_ROOT)
+    source_path = models.CharField(
+        max_length=500,
+        unique=True,
+        verbose_name='Путь к исходному файлу (относительно userfiles)',
+        blank=True,
+        default='',
+    )
+
     faculty = models.CharField(max_length=200, verbose_name='Факультет', blank=True)
     department = models.CharField(max_length=200, verbose_name='Кафедра', blank=True)
     direction = models.CharField(max_length=300, verbose_name='Направление подготовки', blank=True)
@@ -19,7 +30,7 @@ class EducationalPlan(models.Model):
         max_length=50,
         choices=[
             ('draft', 'Черновик'),
-            ('review', 'На проверке'),
+            ('review', 'На проверке'),  # noqa: RUF001
             ('approved', 'Утверждён'),
             ('rejected', 'Отправлен на доработку'),
         ],
@@ -36,17 +47,28 @@ class EducationalPlan(models.Model):
         verbose_name = 'Учебный план'
         verbose_name_plural = 'Учебные планы'
 
-    def parse_file(self):
-        """Парсит загруженный файл и заполняет поля"""
+    def parse_source_path(self):
+        """Парсит реальный файл из userfiles по `source_path` и заполняет поля"""
         from plx_parser import parse_plx_file
 
-        if self.file:
-            data = parse_plx_file(self.file)
+        if not self.source_path:
+            return
 
-            if not data.get('error'):
-                self.direction_code = data.get('direction_code', '')
-                self.direction = data.get('direction', '')
-                self.faculty = data.get('faculty', '')
-                self.department = data.get('department', '')
-                self.year_start = int(data.get('year_start', 0)) if data.get('year_start') else None
-                self.qualification = data.get('qualification', '')
+        root = getattr(settings, "USERFILES_ROOT", None)
+        if not root:
+            return
+
+        abs_path = Path(root) / self.source_path
+        if not abs_path.exists():
+            return
+
+        data = parse_plx_file(str(abs_path))
+        if data.get("error"):
+            return
+
+        self.direction_code = data.get('direction_code', '')
+        self.direction = data.get('direction', '')
+        self.faculty = data.get('faculty', '')
+        self.department = data.get('department', '')
+        self.year_start = int(data.get('year_start', 0)) if data.get('year_start') else None
+        self.qualification = data.get('qualification', '')

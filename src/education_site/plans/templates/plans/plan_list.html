@@ -9,23 +9,29 @@
 
     <table border="1">
         <tr>
+            <th>Файл (source_path)</th>
+            <th>Код направления</th>
             <th>Направление</th>
             <th>Факультет</th>
             <th>Кафедра</th>
             <th>Год</th>
+            <th>Квалификация</th>
             <th>Статус</th>
         </tr>
         {% for plan in plans %}
         <tr>
+            <td>{{ plan.source_path }}</td>
+            <td>{{ plan.direction_code }}</td>
             <td>{{ plan.direction }}</td>
             <td>{{ plan.faculty }}</td>
             <td>{{ plan.department }}</td>
             <td>{{ plan.year_start }}</td>
+            <td>{{ plan.qualification }}</td>
             <td>{{ plan.status }}</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="5">Планов пока нет</td>
+            <td colspan="8">Планов пока нет</td>
         </tr>
         {% endfor %}
     </table>
