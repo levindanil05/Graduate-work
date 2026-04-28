@@ -1,6 +1,8 @@
-import unittest
 import os
+import unittest
+
 from src.plx_parser import parse_plx_file
+
 
 class TestPlxParser(unittest.TestCase):
     def setUp(self):
@@ -54,7 +56,7 @@ class TestPlxParser(unittest.TestCase):
             'department': 'Экономика и предпринимательство',
             'department_code': '24',
             'year_start': '2019',
-            'qualification': 'бакалавр', 
+            'qualification': 'бакалавр',
             'disciplines': []
         }
         self.assertEqual(result['direction'], expected['direction'])
@@ -72,7 +74,7 @@ class TestPlxParser(unittest.TestCase):
         self.assertEqual(result['direction'], '')
         self.assertEqual(result['disciplines'], [])
         self.assertTrue(len(result['error']) > 0)
-        
+
     def test_real_plx_file1(self):
         file_path = os.path.join(self.data_dir, "Ucheb_plan_09.03.01_A_VMKSiS_Z_SOKR_MMF_EVM_2020.plx")
         result = parse_plx_file(file_path)

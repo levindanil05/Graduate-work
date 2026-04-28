@@ -1,7 +1,7 @@
 # plx_parser.py
 import xml.etree.ElementTree as ET
+
 from django.core.files.uploadedfile import UploadedFile
-import io
 
 
 def parse_plx_file(file) -> dict:
