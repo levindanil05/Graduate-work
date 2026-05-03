@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Максимальный размер файла - 10 мегабайт
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
@@ -125,3 +127,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Яндекс.Диск
+YANDEX_DISK_TOKEN = os.getenv('YANDEX_DISK_TOKEN') 
+YANDEX_DISK_BASE_PATH = '/'    # корень диска, где лежат папки факультетов
+
+# Папка для хранения скачанных учебных планов (относительно BASE_DIR)
+USERFILES_ROOT = BASE_DIR / 'userfiles'

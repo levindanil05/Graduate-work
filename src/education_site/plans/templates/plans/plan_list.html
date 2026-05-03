@@ -9,6 +9,10 @@
 
     <table border="1">
         <tr>
+		<form method="post" action="{% url 'plans:sync_yandex' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary">Обновить учебные планы с Яндекс.Диска</button>
+</form>
             <th>Файл (source_path)</th>
             <th>Код направления</th>
             <th>Направление</th>
