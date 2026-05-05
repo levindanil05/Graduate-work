@@ -130,7 +130,7 @@ STATIC_URL = 'static/'
 
 # Яндекс.Диск
 YANDEX_DISK_TOKEN = os.getenv('YANDEX_DISK_TOKEN') 
-YANDEX_DISK_BASE_PATH = '/'    # корень диска, где лежат папки факультетов
+YANDEX_DISK_BASE_PATH = os.getenv('YANDEX_DISK_BASE_PATH') or '/'    # корень диска, где лежат папки факультетов
 
 # Папка для хранения скачанных учебных планов (относительно BASE_DIR)
 USERFILES_ROOT = BASE_DIR / 'userfiles'
