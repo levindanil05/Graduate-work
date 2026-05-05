@@ -16,6 +16,7 @@ __pycache__/
 *.so
 
 # Django
+.env
 *.log
 local_settings.py
 db.sqlite3
