@@ -31,7 +31,7 @@ class DocumentRecord(TimestampedModel):
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.NEW)
 
     # Global explanation is always shown with current version in UI.
-    explanation = models.TextField(blank=True, default="")
+    description = models.TextField(blank=True, default="")
     # Non-indexed low-frequency attributes.
     extra_data = models.JSONField(default=dict, blank=True)
 
@@ -70,12 +70,12 @@ class DocumentVersionRecord(TimestampedModel):
 
     class Meta:
         db_table = "document_version_record"
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["document", "version_number"],
                 name="uniq_document_version_number",
-            )
-        ]
+            ),
+        )
 
 
 class DiscussionMessageRecord(TimestampedModel):
