@@ -4,13 +4,18 @@ from dataclasses import dataclass
 
 from .entities import VersionStatus, WorkflowAction
 
+# Special source marker for rules that apply to any current status.
+ANY_STATUS = "*"
+
 
 @dataclass(frozen=True)
 class TransitionRule:
-    from_status: VersionStatus
+    from_status: VersionStatus | str
     to_status: VersionStatus
     action: WorkflowAction
     requires_comment: bool = False
+    # Optional guard for "ANY" rules.
+    exclude_from: tuple[VersionStatus, ...] = ()
 
 
 # Central table for workflow behavior and UI/action contract.
@@ -45,41 +50,13 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
         action=WorkflowAction.ARCHIVE,
         requires_comment=False,
     ),
+    # Universal rule: any non-trashed version can be moved to trash.
     TransitionRule(
-        from_status=VersionStatus.NEW,
+        from_status=ANY_STATUS,
         to_status=VersionStatus.TRASHED,
         action=WorkflowAction.MOVE_TO_TRASH,
         requires_comment=False,
-    ),
-    TransitionRule(
-        from_status=VersionStatus.ON_REVIEW,
-        to_status=VersionStatus.TRASHED,
-        action=WorkflowAction.MOVE_TO_TRASH,
-        requires_comment=False,
-    ),
-    TransitionRule(
-        from_status=VersionStatus.NEEDS_FIX,
-        to_status=VersionStatus.TRASHED,
-        action=WorkflowAction.MOVE_TO_TRASH,
-        requires_comment=False,
-    ),
-    TransitionRule(
-        from_status=VersionStatus.APPROVED,
-        to_status=VersionStatus.TRASHED,
-        action=WorkflowAction.MOVE_TO_TRASH,
-        requires_comment=False,
-    ),
-    TransitionRule(
-        from_status=VersionStatus.ARCHIVED,
-        to_status=VersionStatus.TRASHED,
-        action=WorkflowAction.MOVE_TO_TRASH,
-        requires_comment=False,
-    ),
-    TransitionRule(
-        from_status=VersionStatus.INVALID,
-        to_status=VersionStatus.TRASHED,
-        action=WorkflowAction.MOVE_TO_TRASH,
-        requires_comment=False,
+        exclude_from=(VersionStatus.TRASHED,),
     ),
     TransitionRule(
         from_status=VersionStatus.TRASHED,
@@ -92,7 +69,11 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
 
 def get_rule(from_status: VersionStatus, to_status: VersionStatus) -> TransitionRule | None:
     for rule in TRANSITION_RULES:
-        if rule.from_status == from_status and rule.to_status == to_status:
+        if rule.to_status != to_status:
+            continue
+        if rule.from_status == from_status:
+            return rule
+        if rule.from_status == ANY_STATUS and from_status not in rule.exclude_from:
             return rule
     return None
 
