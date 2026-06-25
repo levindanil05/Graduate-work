@@ -198,16 +198,27 @@ class DocumentApplicationService:
         return strategy.is_compatible(source_filename, document)
 
     def handle_duplicate_upload(self, document_id: UUID, content_hash: str) -> UploadResult:
-        """Idempotency path: no new version, return existing reference."""
-        # TODO make this version recent and active.
+        """Idempotency path: no new version, promote existing as current."""
         existing = self.versions.get_by_hash(document_id, content_hash)
         if existing is None:
-            raise DomainValidationError("Duplicate version was expected but not found")
+            raise DomainValidationError('Duplicate version was expected but not found')
+
+        document = self.documents.get(document_id)
+        if document is None:
+            raise DomainValidationError('Document not found')
+
+        document.current_version_id = existing.id
+        document.updated_at = datetime.now()
+        self.documents.save(document)
+
+        existing.updated_at = datetime.now()
+        self.versions.save(existing)
+
         return UploadResult(
             document_id=document_id,
             version_id=existing.id,
-            status="already_exists",
-            message="Duplicate upload detected, existing version returned",
+            status='already_exists',
+            message='Duplicate upload detected, existing version returned',
         )
 
     def set_document_explanation(self, document_id: UUID, explanation: str, actor_user_id: int) -> None:

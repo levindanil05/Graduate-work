@@ -4,16 +4,17 @@ from django.core.management import call_command
 from django.shortcuts import redirect, render
 from django_tables2 import RequestConfig
 
-from .filters import EducationalPlanFilter
-from .models import EducationalPlan
-from .tables import EducationalPlanTable
+from documents.querysets import current_plx_versions
+
+from .filters import PlxDocumentFilter
+from .tables import PlxDocumentTable
 
 
 def plan_list(request):
-    """Отображает список всех учебных планов с фильтрацией и сортировкой."""
-    queryset = EducationalPlan.objects.all()
-    filter_set = EducationalPlanFilter(request.GET, queryset=queryset)
-    table = EducationalPlanTable(filter_set.qs)
+    """Список учебных планов (текущие версии документов PLX)."""
+    queryset = current_plx_versions()
+    filter_set = PlxDocumentFilter(request.GET, queryset=queryset)
+    table = PlxDocumentTable(filter_set.qs)
     RequestConfig(request, paginate=False).configure(table)
     return render(
         request,
@@ -26,8 +27,8 @@ def plan_list(request):
 
 
 def plan_add(request):
-    """Добавление нового плана (через админку)"""
-    return redirect('admin:plans_educationalplan_changelist')
+    """Добавление нового плана (через админку documents)."""
+    return redirect('admin:documents_document_changelist')
 
 
 @staff_member_required

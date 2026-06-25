@@ -4,87 +4,74 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from plans.models import EducationalPlan
-from plx_parser import parse_plx_file
+from documents.upload import ingest_plx_file
 
 
 class Command(BaseCommand):
-    help = "Импортирует все .plx из userfiles в БД (сохраняются только метаданные и source_path)"
+    help = 'Импортирует .plx из userfiles через documents upload pipeline'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--path",
+            '--path',
             type=str,
-            default=str(getattr(settings, "USERFILES_ROOT", "")),
-            help="Корневая папка userfiles (по умолчанию settings.USERFILES_ROOT)",
+            default=str(getattr(settings, 'USERFILES_ROOT', '')),
+            help='Корневая папка userfiles (по умолчанию settings.USERFILES_ROOT)',
         )
         parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Только показать, что будет импортировано (без записи в БД)",
+            '--dry-run',
+            action='store_true',
+            help='Только показать, что будет импортировано (без записи в БД)',
         )
 
     def handle(self, *args, **options):
-        root = Path(options["path"]).resolve()
-        dry_run = bool(options["dry_run"])
+        root = Path(options['path']).resolve()
+        dry_run = bool(options['dry_run'])
 
         if not root.exists() or not root.is_dir():
-            self.stderr.write(self.style.ERROR(f"Папка не найдена: {root}"))
+            self.stderr.write(self.style.ERROR(f'Папка не найдена: {root}'))
             return
 
         created = 0
         updated = 0
+        duplicates = 0
         failed = 0
         scanned = 0
-        failures = []
 
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
-                if not filename.lower().endswith(".plx"):
+                if not filename.lower().endswith('.plx'):
                     continue
 
                 scanned += 1
                 abs_path = Path(dirpath) / filename
                 rel_path = abs_path.relative_to(root).as_posix()
 
-                data = parse_plx_file(str(abs_path))
-                if data.get("error"):
-                    failed += 1
-                    failures.append((rel_path, data.get("error", "")))
-                    continue
-
-                defaults = {
-                    "direction_code": data.get("direction_code", ""),
-                    "direction": data.get("direction", ""),
-                    "faculty": data.get("faculty", ""),
-                    "department": data.get("department", ""),
-                    "qualification": data.get("qualification", ""),
-                    "year_start": int(data["year_start"]) if str(data.get("year_start", "")).isdigit() else None,
-                }
-
                 if dry_run:
-                    self.stdout.write(f"[DRY] {rel_path} -> {defaults.get('direction_code','')} {defaults.get('direction','')}")
+                    self.stdout.write(f'[DRY] {rel_path}')
                     continue
 
-                obj, was_created = EducationalPlan.objects.update_or_create(
-                    source_path=rel_path,
-                    defaults=defaults,
-                )
-                if was_created:
-                    created += 1
-                else:
-                    updated += 1
+                try:
+                    result = ingest_plx_file(
+                        file_path=abs_path,
+                        storage_key=rel_path,
+                        auto_link_single_match=True,
+                    )
+                    if result.status == 'already_exists':
+                        duplicates += 1
+                    else:
+                        from documents import models as orm
 
-        self.stdout.write(self.style.SUCCESS(f"Сканировано файлов: {scanned}"))
-        self.stdout.write(self.style.SUCCESS(f"Создано: {created}"))
-        self.stdout.write(self.style.SUCCESS(f"Обновлено: {updated}"))
-        self.stdout.write(self.style.WARNING(f"Ошибок: {failed}"))
+                        version = orm.DocumentVersion.objects.get(pk=result.version_id)
+                        if version.version_number == 1:
+                            created += 1
+                        else:
+                            updated += 1
+                except Exception as exc:
+                    failed += 1
+                    self.stderr.write(f'{rel_path}: {exc}')
 
-        if failures:
-            self.stdout.write("")
-            self.stdout.write("Файлы с ошибками парсинга:")
-            for rel_path, err in failures[:50]:
-                self.stdout.write(f"- {rel_path}: {err}")
-            if len(failures) > 50:
-                self.stdout.write(f"... и ещё {len(failures) - 50}")
-
+        self.stdout.write(self.style.SUCCESS(f'Сканировано файлов: {scanned}'))
+        self.stdout.write(self.style.SUCCESS(f'Создано документов: {created}'))
+        self.stdout.write(self.style.SUCCESS(f'Новых версий: {updated}'))
+        self.stdout.write(self.style.WARNING(f'Дубликатов: {duplicates}'))
+        self.stdout.write(self.style.WARNING(f'Ошибок: {failed}'))

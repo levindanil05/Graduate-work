@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_tables2',
     'django_filters',
+    'documents',
     'plans',
 ]
 

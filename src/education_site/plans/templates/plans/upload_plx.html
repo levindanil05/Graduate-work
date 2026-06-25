@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Загрузка PLX</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 720px; }
+        .match { border: 1px solid #ccc; padding: 0.75rem; margin: 0.5rem 0; border-radius: 4px; }
+        label { display: block; margin: 0.5rem 0; }
+    </style>
+</head>
+<body>
+    <h1>Загрузка учебного плана</h1>
+    <p><a href="{% url 'plans:plan_list' %}">← К списку</a></p>
+
+    {% if matches %}
+    <p>Файл <strong>{{ pending_name }}</strong> похож на существующие документы. Привязать к одному из них?</p>
+    {% for doc in matches %}
+    <form method="post" class="match">
+        {% csrf_token %}
+        <input type="hidden" name="confirm_document_id" value="{{ doc.id }}">
+        <strong>{{ doc.identity.canonical_name }}</strong>
+        <div>Алиасы: {{ doc.identity.aliases|join:", " }}</div>
+        <button type="submit">Привязать к этому документу</button>
+    </form>
+    {% endfor %}
+    <p><a href="{% url 'plans:upload_plx' %}?cancel=1">Отменить и загрузить как новый документ</a></p>
+    {% else %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label>
+            Файл .plx
+            <input type="file" name="plx_file" accept=".plx" required>
+        </label>
+        <label>
+            <input type="checkbox" name="force_new">
+            Всегда создавать новый документ (без сопоставления)
+        </label>
+        <button type="submit">Загрузить</button>
+    </form>
+    {% endif %}
+</body>
+</html>

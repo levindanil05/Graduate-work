@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 class EducationalPlan(models.Model):
+    """Устаревшая модель. Данные переносятся в documents.Document."""
     # Источник: реальный файл в userfiles (без копирования в MEDIA_ROOT)
     source_path = models.CharField(
         max_length=500,

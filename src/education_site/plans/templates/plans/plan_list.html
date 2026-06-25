@@ -48,6 +48,7 @@
     <h1>Учебные планы</h1>
     <div class="toolbar">
         <a href="/admin/">Перейти в админку</a>
+        <a href="{% url 'plans:upload_plx' %}">Загрузить PLX</a>
         <form method="post" action="{% url 'plans:sync_yandex' %}">
             {% csrf_token %}
             <button type="submit">Обновить учебные планы с Яндекс.Диска</button>

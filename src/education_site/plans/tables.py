@@ -1,16 +1,40 @@
 import django_tables2 as tables
 
-from .models import EducationalPlan
+from documents.models import DocumentVersion
 
 
-class EducationalPlanTable(tables.Table):
-    source_path = tables.Column(verbose_name='Файл')
-    direction_code = tables.Column(verbose_name='Код направления')
-    direction = tables.Column(verbose_name='Направление')
-    faculty = tables.Column(verbose_name='Факультет')
-    department = tables.Column(verbose_name='Кафедра')
-    year_start = tables.Column(verbose_name='Год')
-    qualification = tables.Column(verbose_name='Квалификация')
+class PlxDocumentTable(tables.Table):
+    storage_key = tables.Column(verbose_name='Файл')
+    direction_code = tables.Column(
+        accessor='direction_code',
+        verbose_name='Код направления',
+        order_by='extracted_metadata__direction_code',
+    )
+    direction = tables.Column(
+        accessor='direction',
+        verbose_name='Направление',
+        order_by='extracted_metadata__direction',
+    )
+    faculty = tables.Column(
+        accessor='faculty',
+        verbose_name='Факультет',
+        order_by='extracted_metadata__faculty',
+    )
+    department = tables.Column(
+        accessor='department',
+        verbose_name='Кафедра',
+        order_by='extracted_metadata__department',
+    )
+    year_start = tables.Column(
+        accessor='year_start',
+        verbose_name='Год',
+        order_by='extracted_metadata__year_start',
+    )
+    qualification = tables.Column(
+        accessor='qualification',
+        verbose_name='Квалификация',
+        order_by='extracted_metadata__qualification',
+    )
     status = tables.Column(
         verbose_name='Статус',
         accessor='get_status_display',
@@ -19,9 +43,9 @@ class EducationalPlanTable(tables.Table):
     updated_at = tables.DateTimeColumn(verbose_name='Обновлён', format='d.m.Y H:i')
 
     class Meta:
-        model = EducationalPlan
+        model = DocumentVersion
         fields = (
-            'source_path',
+            'storage_key',
             'direction_code',
             'direction',
             'faculty',

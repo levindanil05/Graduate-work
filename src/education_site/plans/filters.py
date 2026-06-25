@@ -1,30 +1,45 @@
 import django_filters
 from django.db.models import Q
 
-from .models import EducationalPlan
+from documents.models import DocumentVersion, VersionStatus
 
 
-class EducationalPlanFilter(django_filters.FilterSet):
+class PlxDocumentFilter(django_filters.FilterSet):
     status = django_filters.ChoiceFilter(
-        choices=EducationalPlan._meta.get_field('status').choices,
+        choices=VersionStatus.choices,
         label='Статус',
     )
-    faculty = django_filters.CharFilter(lookup_expr='icontains', label='Факультет')
-    department = django_filters.CharFilter(lookup_expr='icontains', label='Кафедра')
-    year_start = django_filters.NumberFilter(label='Год начала')
-    direction_code = django_filters.CharFilter(lookup_expr='icontains', label='Код направления')
+    faculty = django_filters.CharFilter(
+        field_name='extracted_metadata__faculty',
+        lookup_expr='icontains',
+        label='Факультет',
+    )
+    department = django_filters.CharFilter(
+        field_name='extracted_metadata__department',
+        lookup_expr='icontains',
+        label='Кафедра',
+    )
+    year_start = django_filters.NumberFilter(
+        field_name='extracted_metadata__year_start',
+        label='Год начала',
+    )
+    direction_code = django_filters.CharFilter(
+        field_name='extracted_metadata__direction_code',
+        lookup_expr='icontains',
+        label='Код направления',
+    )
     q = django_filters.CharFilter(method='filter_q', label='Поиск')
 
     class Meta:
-        model = EducationalPlan
+        model = DocumentVersion
         fields = []
 
     def filter_q(self, queryset, name, value):
         if not value:
             return queryset
         return queryset.filter(
-            Q(source_path__icontains=value)
-            | Q(direction__icontains=value)
-            | Q(faculty__icontains=value)
-            | Q(department__icontains=value)
+            Q(storage_key__icontains=value)
+            | Q(extracted_metadata__direction__icontains=value)
+            | Q(extracted_metadata__faculty__icontains=value)
+            | Q(extracted_metadata__department__icontains=value)
         )
