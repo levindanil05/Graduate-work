@@ -27,17 +27,17 @@
     </ul>
     {% endif %}
 
-    {% if allowed_transitions %}
+    {% if transition_choices %}
     <form method="post">
         {% csrf_token %}
         {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
 
         <p>Выберите новый статус:</p>
-        {% for rule in allowed_transitions %}
+        {% for rule, action_label, target_label in transition_choices %}
         <label class="option">
             <input type="radio" name="target_status" value="{{ rule.to_status.value }}" required
-                {% if request.GET.target == rule.to_status.value %}checked{% endif %}>
-            {{ transition_label rule }} → {{ target_status_label rule.to_status }}
+                {% if preselected_target == rule.to_status.value %}checked{% endif %}>
+            {{ action_label }} → {{ target_label }}
             {% if rule.requires_comment %}<em>(комментарий обязателен)</em>{% endif %}
         </label>
         {% endfor %}

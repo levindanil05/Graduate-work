@@ -47,7 +47,7 @@
         {% if current_version %}
         <a href="{% url 'plans:download_current' document.id %}">Скачать актуальную</a>
         <a href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую версию</a>
-        {% if allowed_transitions %}
+        {% if transition_choices %}
         <a href="{% url 'plans:transition_status' document.id %}">Изменить статус</a>
         {% endif %}
         {% for rule, label in transition_choices %}

@@ -93,11 +93,8 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'versions': document.versions.order_by('-version_number'),
             'workflow_history': _workflow_history(document),
             'discussion_messages': _discussion_messages(current),
-            'allowed_transitions': allowed_transitions,
             'transition_choices': transition_choices,
             'tab': tab,
-            'target_status_label': target_status_label,
-            'transition_label': transition_label,
         },
     )
 
@@ -111,6 +108,10 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
         raise Http404('У документа нет текущей версии')
 
     allowed = list_allowed_transitions(current.status)
+    transition_choices = [
+        (rule, transition_label(rule), target_status_label(rule.to_status))
+        for rule in allowed
+    ]
     next_url = request.GET.get('next') or request.POST.get('next') or ''
 
     if request.method == 'POST':
@@ -143,10 +144,9 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
         {
             'document': document,
             'current_version': current,
-            'allowed_transitions': allowed,
-            'transition_label': transition_label,
-            'target_status_label': target_status_label,
+            'transition_choices': transition_choices,
             'next_url': next_url,
+            'preselected_target': request.GET.get('target', ''),
         },
     )
 
