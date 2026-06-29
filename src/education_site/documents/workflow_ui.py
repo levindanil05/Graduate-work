@@ -17,6 +17,10 @@ _ACTION_LABELS: dict[WorkflowAction, str] = {
     WorkflowAction.HARD_DELETE: 'Удалить физически',
 }
 
+_ACTION_LABELS_BY_VALUE: dict[str, str] = {
+    action.value: label for action, label in _ACTION_LABELS.items()
+}
+
 
 def _to_domain_status(status: str | VersionStatus) -> VersionStatus:
     if isinstance(status, VersionStatus):
@@ -29,7 +33,13 @@ def list_allowed_transitions(from_status: str | VersionStatus) -> list[Transitio
 
 
 def transition_label(rule: TransitionRule) -> str:
-    return _ACTION_LABELS.get(rule.action, rule.action.value)
+    return action_label(rule.action)
+
+
+def action_label(action: str | WorkflowAction) -> str:
+    if isinstance(action, WorkflowAction):
+        return _ACTION_LABELS.get(action, action.value)
+    return _ACTION_LABELS_BY_VALUE.get(action, action)
 
 
 def target_status_label(status: str | VersionStatus) -> str:

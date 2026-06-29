@@ -122,7 +122,7 @@
                 <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
                 <td>v{{ item.document_version.version_number }}</td>
                 <td>{{ item.from_status|status_label }} → {{ item.to_status|status_label }}</td>
-                <td>{{ item.action }}</td>
+                <td>{{ item.action|action_label_filter }}</td>
                 <td>{{ item.action_comment|default:"—" }}</td>
             </tr>
             {% empty %}
