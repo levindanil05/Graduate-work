@@ -1,24 +1,23 @@
 from __future__ import annotations
 
+from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
+
 from documents.entities import VersionStatus, WorkflowAction
 from documents.models import VersionStatus as OrmVersionStatus
 from documents.workflow_rules import TransitionRule, list_rules_from
 
 
 _ACTION_LABELS: dict[WorkflowAction, str] = {
-    WorkflowAction.SUBMIT: 'Отправить на проверку',
-    WorkflowAction.REQUEST_FIX: 'Отправить на доработку',
-    WorkflowAction.RESUBMIT: 'Повторно отправить на проверку',
-    WorkflowAction.APPROVE: 'Утвердить',
-    WorkflowAction.ARCHIVE: 'В архив',
-    WorkflowAction.MARK_INVALID: 'Пометить невалидным',
-    WorkflowAction.MOVE_TO_TRASH: 'В корзину',
-    WorkflowAction.RESTORE: 'Восстановить',
-    WorkflowAction.HARD_DELETE: 'Удалить физически',
-}
-
-_ACTION_LABELS_BY_VALUE: dict[str, str] = {
-    action.value: label for action, label in _ACTION_LABELS.items()
+    WorkflowAction.SUBMIT: _lazy('Submit for review'),
+    WorkflowAction.REQUEST_FIX: _lazy('Request fix'),
+    WorkflowAction.RESUBMIT: _lazy('Resubmit for review'),
+    WorkflowAction.APPROVE: _lazy('Approve'),
+    WorkflowAction.ARCHIVE: _lazy('Archive'),
+    WorkflowAction.MARK_INVALID: _lazy('Mark invalid'),
+    WorkflowAction.MOVE_TO_TRASH: _lazy('Move to trash'),
+    WorkflowAction.RESTORE: _lazy('Restore'),
+    WorkflowAction.HARD_DELETE: _lazy('Hard delete'),
 }
 
 
@@ -38,8 +37,13 @@ def transition_label(rule: TransitionRule) -> str:
 
 def action_label(action: str | WorkflowAction) -> str:
     if isinstance(action, WorkflowAction):
-        return _ACTION_LABELS.get(action, action.value)
-    return _ACTION_LABELS_BY_VALUE.get(action, action)
+        label = _ACTION_LABELS.get(action)
+        return _(label) if label else action.value
+    try:
+        label = _ACTION_LABELS.get(WorkflowAction(action))
+        return _(label) if label else action
+    except ValueError:
+        return action
 
 
 def target_status_label(status: str | VersionStatus) -> str:

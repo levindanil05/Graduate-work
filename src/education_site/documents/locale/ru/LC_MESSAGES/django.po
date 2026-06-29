@@ -1,0 +1,85 @@
+# Russian translations for the documents and plans apps.
+# Regenerate template: python manage.py makemessages -l ru
+# Compile: python manage.py compilemessages
+
+msgid ""
+msgstr ""
+"Project-Id-Version: education_site\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+# documents/services.py
+msgid "No naming strategy for document type: %(type)s"
+msgstr "Нет стратегии именования для типа документа: %(type)s"
+
+msgid "Document not found"
+msgstr "Документ не найден"
+
+msgid "Upload is not allowed for the current user"
+msgstr "Загрузка недоступна для текущего пользователя"
+
+msgid "Filename is not compatible with the document identity"
+msgstr "Имя файла не совместимо с идентификатором документа"
+
+msgid "Duplicate version was expected but not found"
+msgstr "Ожидалась дублирующая версия, но она не найдена"
+
+msgid "User cannot update the document explanation"
+msgstr "Пользователь не может изменить пояснение документа"
+
+msgid "Version not found"
+msgstr "Версия не найдена"
+
+msgid "Parent document not found"
+msgstr "Родительский документ не найден"
+
+msgid "User cannot perform this transition"
+msgstr "Пользователь не может выполнить этот переход"
+
+msgid "Transition %(from_status)s → %(to_status)s is not allowed"
+msgstr "Переход «%(from_status)s» → «%(to_status)s» не допускается"
+
+msgid "Comment is required for this transition"
+msgstr "Для этого перехода требуется комментарий"
+
+msgid "Version uploaded"
+msgstr "Версия загружена"
+
+msgid "Duplicate upload detected; existing version returned"
+msgstr "Обнаружена повторная загрузка; возвращена существующая версия"
+
+msgid "Metadata extraction failed"
+msgstr "Не удалось извлечь метаданные"
+
+# documents/workflow_ui.py — workflow action labels
+msgid "Submit for review"
+msgstr "Отправить на проверку"
+
+msgid "Request fix"
+msgstr "Отправить на доработку"
+
+msgid "Resubmit for review"
+msgstr "Повторно отправить на проверку"
+
+msgid "Approve"
+msgstr "Утвердить"
+
+msgid "Archive"
+msgstr "В архив"
+
+msgid "Mark invalid"
+msgstr "Пометить невалидным"
+
+msgid "Move to trash"
+msgstr "В корзину"
+
+msgid "Restore"
+msgstr "Восстановить"
+
+msgid "Hard delete"
+msgstr "Удалить физически"

@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
+from django.utils.translation import gettext as _
+
 from .contracts import (
     DiscussionRepository,
     DocumentNamingStrategy,
@@ -85,7 +87,9 @@ class DocumentApplicationService:
         for strategy in self.naming_strategies:
             if strategy.supports(document_type):
                 return strategy
-        raise DomainValidationError(f"No naming strategy for type: {document_type}")
+        raise DomainValidationError(
+            _('No naming strategy for document type: %(type)s') % {'type': document_type.value}
+        )
 
     def _resolve_metadata_extractor(self, document_type: DocumentType) -> MetadataExtractor | None:
         for extractor in self.metadata_extractors:
@@ -126,18 +130,17 @@ class DocumentApplicationService:
         """Upload version to existing document after compatibility checks."""
         document = self.documents.get(document_id)
         if not document:
-            raise DomainValidationError("Document not found")
+            raise DomainValidationError(_('Document not found'))
 
         if not self.permissions.can_upload_version(request.user_id, document):
-            raise DomainValidationError("Upload is not allowed for current user")
+            raise DomainValidationError(_('Upload is not allowed for the current user'))
 
         if not self.validate_filename_compatibility(document, request.source_filename):
-            raise DomainValidationError("Filename is not compatible with document identity")
+            raise DomainValidationError(_('Filename is not compatible with the document identity'))
 
         file_hash = self.hashing.hash_file(request.file_path)
         duplicate = self.versions.get_by_hash(document.id, file_hash)
         if duplicate is not None:
-            # TODO make existing version recent and active.
             return self.handle_duplicate_upload(document.id, file_hash)
 
         current_versions = self.versions.list_for_document(document.id)
@@ -189,7 +192,7 @@ class DocumentApplicationService:
             document_id=document.id,
             version_id=saved_version.id,
             status=saved_version.status.value,
-            message="Version uploaded",
+            message=_('Version uploaded'),
         )
 
     def validate_filename_compatibility(self, document: Document, source_filename: str) -> bool:
@@ -201,11 +204,11 @@ class DocumentApplicationService:
         """Idempotency path: no new version, promote existing as current."""
         existing = self.versions.get_by_hash(document_id, content_hash)
         if existing is None:
-            raise DomainValidationError('Duplicate version was expected but not found')
+            raise DomainValidationError(_('Duplicate version was expected but not found'))
 
         document = self.documents.get(document_id)
         if document is None:
-            raise DomainValidationError('Document not found')
+            raise DomainValidationError(_('Document not found'))
 
         document.current_version_id = existing.id
         document.updated_at = datetime.now()
@@ -218,16 +221,15 @@ class DocumentApplicationService:
             document_id=document_id,
             version_id=existing.id,
             status='already_exists',
-            message='Duplicate upload detected, existing version returned',
+            message=_('Duplicate upload detected; existing version returned'),
         )
 
     def set_document_explanation(self, document_id: UUID, explanation: str, actor_user_id: int) -> None:
         document = self.documents.get(document_id)
         if not document:
-            raise DomainValidationError("Document not found")
-        # Permission boundary can be extended with dedicated policy if needed.
+            raise DomainValidationError(_('Document not found'))
         if not self.permissions.can_upload_version(actor_user_id, document):
-            raise DomainValidationError("User cannot update document explanation")
+            raise DomainValidationError(_('User cannot update the document explanation'))
         document.explanation = explanation.strip()
         document.updated_at = datetime.now()
         self.documents.save(document)
@@ -241,26 +243,32 @@ class DocumentApplicationService:
         action_comment: str,
         allow_without_comment: bool,
     ) -> DocumentVersion:
+        from .workflow_ui import target_status_label
+
         version = self.versions.get(version_id)
         if version is None:
-            raise DomainValidationError("Version not found")
+            raise DomainValidationError(_('Version not found'))
 
         document = self.documents.get(version.document_id)
         if document is None:
-            raise DomainValidationError("Parent document not found")
+            raise DomainValidationError(_('Parent document not found'))
 
         if not self.permissions.can_transition(actor_user_id, version, target_status):
-            raise DomainValidationError("User cannot perform this transition")
+            raise DomainValidationError(_('User cannot perform this transition'))
 
         rule = get_rule(version.status, target_status)
         if rule is None:
             raise DomainValidationError(
-                f"Transition {version.status.value} -> {target_status.value} is not allowed"
+                _('Transition %(from_status)s → %(to_status)s is not allowed')
+                % {
+                    'from_status': target_status_label(version.status),
+                    'to_status': target_status_label(target_status),
+                }
             )
 
         normalized_comment = action_comment.strip()
         if rule.requires_comment and not normalized_comment and not allow_without_comment:
-            raise DomainValidationError("Comment is required for this transition")
+            raise DomainValidationError(_('Comment is required for this transition'))
 
         transition = WorkflowTransition(
             document_version_id=version.id,
@@ -282,7 +290,7 @@ class DocumentApplicationService:
     ) -> DiscussionMessage:
         version = self.versions.get(version_id)
         if version is None:
-            raise DomainValidationError("Version not found")
+            raise DomainValidationError(_('Version not found'))
         thread = self.discussions.get_or_create_thread(version_id)
         msg = DiscussionMessage(
             thread_id=thread.id,
@@ -316,10 +324,9 @@ class DocumentApplicationService:
             from_status=from_status,
             to_status=VersionStatus.INVALID,
             action=WorkflowAction.MARK_INVALID,
-            action_comment="Metadata extraction failed",
+            action_comment=_('Metadata extraction failed'),
             actor_user_id=version.created_by_user_id,
             created_at=datetime.now(),
         )
         self.workflow.save_transition(transition)
         return saved
-

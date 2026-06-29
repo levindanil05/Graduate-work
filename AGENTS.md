@@ -9,9 +9,11 @@
 ### Правила
 
 - Все подписи кнопок, заголовки колонок, статусы, действия workflow, сообщения об ошибках и подсказки — **на русском языке**.
-- Английские идентификаторы (`submit`, `on_review`, `draft` и т.п.) допустимы только во внутреннем коде, БД и API; пользователю показываются **локализованные подписи** через `get_*_display()`, `workflow_ui.action_label()`, `status_label` и аналоги.
+- Английские идентификаторы (`submit`, `on_review`, `draft` и т.п.) допустимы только во внутреннем коде, БД и API; пользователю показываются **локализованные подписи**.
+- Пользовательские строки в Python оборачивайте в `django.utils.translation.gettext` / `gettext_lazy` (`_()`); **все русские переводы храните в одном месте** — [`documents/locale/ru/LC_MESSAGES/django.po`](src/education_site/documents/locale/ru/LC_MESSAGES/django.po). После правок `.po`: `python manage.py compilemessages` (нужен GNU gettext) или `polib`: `po.save_as_mofile('django.mo')`. В репозитории должен быть скомпилированный `django.mo`.
+- Статусы версий — через `choices` модели (`get_status_display()`). Действия workflow — через `workflow_ui.action_label()` (читает из того же `.po`).
 - Допустимы устоявшиеся аббревиатуры, понятные целевой аудитории (например, PLX как формат файла), если они уже закреплены в документации проекта.
-- При добавлении нового enum, статуса или действия сразу добавляйте русскую метку в `choices` модели или в [`documents/workflow_ui.py`](src/education_site/documents/workflow_ui.py).
+- При добавлении новой пользовательской строки: msgid в коде (английский, по соглашению Django) + запись `msgstr` в `django.po`.
 
 ### Примеры
 
