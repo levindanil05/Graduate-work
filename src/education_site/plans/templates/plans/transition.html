@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Изменить статус — {{ document.canonical_name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 640px; }
+        label { display: block; margin: 0.75rem 0 0.25rem; }
+        .option { margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        textarea { width: 100%; box-sizing: border-box; }
+        .actions { margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .messages { list-style: none; padding: 0; }
+        .messages li { padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+        .messages .error { background: #fce8e6; }
+    </style>
+</head>
+<body>
+    <p><a href="{% url 'plans:document_detail' document.id %}">← К карточке</a></p>
+    <h1>Изменить статус</h1>
+    <p>{{ document.canonical_name }} · текущий статус: <strong>{{ current_version.get_status_display }}</strong></p>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if allowed_transitions %}
+    <form method="post">
+        {% csrf_token %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+
+        <p>Выберите новый статус:</p>
+        {% for rule in allowed_transitions %}
+        <label class="option">
+            <input type="radio" name="target_status" value="{{ rule.to_status.value }}" required
+                {% if request.GET.target == rule.to_status.value %}checked{% endif %}>
+            {{ transition_label rule }} → {{ target_status_label rule.to_status }}
+            {% if rule.requires_comment %}<em>(комментарий обязателен)</em>{% endif %}
+        </label>
+        {% endfor %}
+
+        <label for="action_comment">Комментарий к действию</label>
+        <textarea id="action_comment" name="action_comment" rows="3"></textarea>
+
+        <label>
+            <input type="checkbox" name="allow_without_comment">
+            Подтвердить без комментария
+        </label>
+
+        <div class="actions">
+            <button type="submit">Подтвердить</button>
+            <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'plans:document_detail' document.id %}{% endif %}">Отмена</a>
+        </div>
+    </form>
+    {% else %}
+    <p>Для текущего статуса нет доступных переходов.</p>
+    {% endif %}
+</body>
+</html>

@@ -26,8 +26,15 @@
     {% endfor %}
     <p><a href="{% url 'plans:upload_plx' %}?cancel=1">Отменить и загрузить как новый документ</a></p>
     {% else %}
+    {% if preset_document %}
+    <p>Новая версия для документа: <strong>{{ preset_document.canonical_name }}</strong></p>
+    <p><a href="{% url 'plans:document_detail' preset_document.id %}">← К карточке</a></p>
+    {% endif %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {% if preset_document %}
+        <input type="hidden" name="document_id" value="{{ preset_document.id }}">
+        {% endif %}
         <label>
             Файл .plx
             <input type="file" name="plx_file" accept=".plx" required>

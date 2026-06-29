@@ -81,3 +81,17 @@ def get_rule(from_status: VersionStatus, to_status: VersionStatus) -> Transition
 def can_transition(from_status: VersionStatus, to_status: VersionStatus) -> bool:
     return get_rule(from_status, to_status) is not None
 
+
+def list_rules_from(from_status: VersionStatus) -> list[TransitionRule]:
+    """Return all transition rules available from the given status."""
+    rules: list[TransitionRule] = []
+    seen_targets: set[VersionStatus] = set()
+    for rule in TRANSITION_RULES:
+        matches = rule.from_status == from_status or (
+            rule.from_status == ANY_STATUS and from_status not in rule.exclude_from
+        )
+        if matches and rule.to_status not in seen_targets:
+            rules.append(rule)
+            seen_targets.add(rule.to_status)
+    return rules
+

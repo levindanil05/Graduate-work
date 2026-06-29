@@ -6,11 +6,12 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from documents.entities import DocumentType
 from documents.factory import build_document_service
+from documents.models import Document
 from documents.services import UploadRequest
 from documents.upload import ingest_plx_file
 
@@ -25,17 +26,31 @@ def _clear_pending_upload(request) -> None:
         Path(pending).unlink()
 
 
+def _redirect_after_upload(request, document_id: UUID | None):
+    if document_id:
+        return redirect('plans:document_detail', document_id=document_id)
+    return redirect('plans:plan_list')
+
+
 @staff_member_required
 @require_http_methods(['GET', 'POST'])
 def upload_plx(request):
     """Загрузка PLX: matching, hash-dedup, parse → invalid."""
     service = build_document_service()
+    preset_document_id = request.GET.get('document_id', '').strip() or request.POST.get('document_id', '').strip()
+    preset_document = None
+    if preset_document_id:
+        preset_document = get_object_or_404(Document, pk=preset_document_id)
 
     if request.method == 'POST':
         confirm_id = request.POST.get('confirm_document_id', '').strip()
         force_new = request.POST.get('force_new') == 'on'
         pending_path = request.session.get(SESSION_UPLOAD_PATH)
         pending_name = request.session.get(SESSION_UPLOAD_NAME)
+        target_document_id = UUID(confirm_id) if confirm_id else None
+
+        if preset_document_id and not confirm_id and request.FILES.get('plx_file'):
+            target_document_id = UUID(preset_document_id)
 
         if confirm_id and pending_path:
             try:
@@ -50,7 +65,7 @@ def upload_plx(request):
                 messages.error(request, f'Ошибка загрузки: {exc}')
             finally:
                 _clear_pending_upload(request)
-            return redirect('plans:plan_list')
+            return _redirect_after_upload(request, UUID(confirm_id))
 
         uploaded = request.FILES.get('plx_file')
         if not uploaded:
@@ -67,6 +82,17 @@ def upload_plx(request):
         storage_key = uploaded.name.replace('\\', '/')
 
         try:
+            if target_document_id:
+                result = ingest_plx_file(
+                    file_path=tmp_path,
+                    storage_key=storage_key,
+                    user_id=request.user.id,
+                    document_id=target_document_id,
+                )
+                messages.success(request, f'Загружено: {result.message} ({result.status})')
+                tmp_path.unlink(missing_ok=True)
+                return _redirect_after_upload(request, target_document_id)
+
             if force_new:
                 result = ingest_plx_file(
                     file_path=tmp_path,
@@ -95,6 +121,7 @@ def upload_plx(request):
                     {
                         'matches': matches,
                         'pending_name': storage_key,
+                        'preset_document': preset_document,
                     },
                 )
 
@@ -110,10 +137,22 @@ def upload_plx(request):
         except Exception as exc:
             tmp_path.unlink(missing_ok=True)
             messages.error(request, f'Ошибка загрузки: {exc}')
+            if preset_document_id:
+                return redirect(f"{request.path}?document_id={preset_document_id}")
             return redirect('plans:upload_plx')
 
     if request.GET.get('cancel'):
         _clear_pending_upload(request)
+        if preset_document_id:
+            return redirect('plans:document_detail', document_id=preset_document_id)
         return redirect('plans:upload_plx')
 
-    return render(request, 'plans/upload_plx.html', {'matches': [], 'pending_name': ''})
+    return render(
+        request,
+        'plans/upload_plx.html',
+        {
+            'matches': [],
+            'pending_name': '',
+            'preset_document': preset_document,
+        },
+    )

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{{ document.canonical_name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; }
+        .toolbar { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
+        .meta { color: #555; margin-bottom: 1rem; }
+        .tabs { display: flex; gap: 0.5rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem; }
+        .tabs a { padding: 0.5rem 1rem; text-decoration: none; color: inherit; border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; }
+        .tabs a.active { border-color: #ccc; background: #f9f9f9; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+        tr.current { background: #f0f7ff; }
+        .messages { list-style: none; padding: 0; }
+        .messages li { padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+        .messages .success { background: #e6f4ea; }
+        .messages .error { background: #fce8e6; }
+        .discussion-msg { border-left: 3px solid #ccc; padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
+        .explanation-box { background: #f9f9f9; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+        pre.metadata { background: #f5f5f5; padding: 1rem; overflow-x: auto; }
+        .errors { color: #b00020; }
+    </style>
+</head>
+<body>
+    <p><a href="{% url 'plans:plan_list' %}">← К списку</a></p>
+
+    <h1>{{ document.canonical_name }}</h1>
+    <div class="meta">
+        Тип: {{ document.get_document_type_display }}
+        {% if current_version %}
+        · Статус: <strong>{{ current_version.get_status_display }}</strong>
+        · Версия {{ current_version.version_number }}
+        {% endif %}
+    </div>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="toolbar">
+        {% if current_version %}
+        <a href="{% url 'plans:download_current' document.id %}">Скачать актуальную</a>
+        <a href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую версию</a>
+        {% if allowed_transitions %}
+        <a href="{% url 'plans:transition_status' document.id %}">Изменить статус</a>
+        {% endif %}
+        {% for rule, label in transition_choices %}
+            {% if rule.action.value == 'move_to_trash' or rule.action.value == 'restore' %}
+            <a href="{% url 'plans:transition_status' document.id %}?target={{ rule.to_status.value }}">{{ label }}</a>
+            {% endif %}
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="explanation-box">
+        <h2>Пояснение документа</h2>
+        {% if user.is_staff %}
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="explanation">
+            <textarea name="explanation" rows="3" style="width:100%">{{ document.explanation }}</textarea>
+            <button type="submit">Сохранить пояснение</button>
+        </form>
+        {% else %}
+        <p>{{ document.explanation|default:"—" }}</p>
+        {% endif %}
+    </div>
+
+    <nav class="tabs">
+        <a href="?tab=versions" class="{% if tab == 'versions' %}active{% endif %}">Версии</a>
+        <a href="?tab=workflow" class="{% if tab == 'workflow' %}active{% endif %}">Workflow</a>
+        <a href="?tab=discussion" class="{% if tab == 'discussion' %}active{% endif %}">Обсуждение</a>
+        <a href="?tab=metadata" class="{% if tab == 'metadata' %}active{% endif %}">Метаданные</a>
+    </nav>
+
+    {% if tab == 'versions' %}
+    <table>
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Файл</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for version in versions %}
+            <tr class="{% if current_version and version.id == current_version.id %}current{% endif %}">
+                <td>{{ version.version_number }}{% if current_version and version.id == current_version.id %} (текущая){% endif %}</td>
+                <td>{{ version.updated_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ version.get_status_display }}</td>
+                <td>{{ version.source_filename }}</td>
+                <td><a href="{% url 'plans:download_version' document.id version.id %}">Скачать</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Версий нет</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif tab == 'workflow' %}
+    {% load plans_extras %}
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Версия</th>
+                <th>Из → В</th>
+                <th>Действие</th>
+                <th>Комментарий</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in workflow_history %}
+            <tr>
+                <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
+                <td>v{{ item.document_version.version_number }}</td>
+                <td>{{ item.from_status|status_label }} → {{ item.to_status|status_label }}</td>
+                <td>{{ item.action }}</td>
+                <td>{{ item.action_comment|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">История переходов пуста</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif tab == 'discussion' %}
+    {% if current_version %}
+        {% for msg in discussion_messages %}
+        <div class="discussion-msg">
+            <div><small>{{ msg.created_at|date:"d.m.Y H:i" }}</small></div>
+            <div>{{ msg.message }}</div>
+        </div>
+        {% empty %}
+        <p>Сообщений пока нет.</p>
+        {% endfor %}
+        {% if user.is_staff %}
+        <form method="post" style="margin-top:1rem">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="discussion">
+            <textarea name="message" rows="3" style="width:100%" required placeholder="Сообщение обсуждения"></textarea>
+            <button type="submit">Отправить</button>
+        </form>
+        {% endif %}
+    {% else %}
+        <p>Нет текущей версии для обсуждения.</p>
+    {% endif %}
+    {% elif tab == 'metadata' %}
+    {% if current_version %}
+        {% if current_version.status == 'invalid' and current_version.error_messages %}
+        <h3>Ошибки разбора</h3>
+        <ul class="errors">
+            {% for err in current_version.error_messages %}
+            <li>{{ err }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <h3>Извлечённые метаданные</h3>
+        <pre class="metadata">{% for key, value in current_version.extracted_metadata.items %}{{ key }}: {{ value }}
+{% empty %}—{% endfor %}</pre>
+    {% else %}
+        <p>Нет текущей версии.</p>
+    {% endif %}
+    {% endif %}
+</body>
+</html>
