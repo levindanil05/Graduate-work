@@ -29,3 +29,22 @@ class UserfilesStoragePort:
 
     def resolve_path(self, storage_key: str) -> Path:
         return self.root / storage_key
+
+    def rename(self, storage_key: str, new_basename: str) -> str:
+        """Переименовывает файл, сохраняя каталог относительно USERFILES_ROOT."""
+        old_key = storage_key.replace('\\', '/').lstrip('/')
+        new_basename = Path(new_basename).name
+        if not new_basename:
+            raise ValueError('Empty destination filename')
+        old_path = self.root / old_key
+        if not old_path.exists():
+            raise FileNotFoundError(old_key)
+        new_key = str(Path(old_key).with_name(new_basename)).replace('\\', '/')
+        new_path = self.root / new_key
+        if new_path.resolve() == old_path.resolve():
+            return old_key
+        if new_path.exists():
+            raise FileExistsError(new_key)
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        old_path.rename(new_path)
+        return new_key

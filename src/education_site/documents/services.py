@@ -330,6 +330,93 @@ class DocumentApplicationService:
         document.updated_at = datetime.now()
         self.documents.save(document)
 
+    def apply_plx_canonical_rename(
+        self,
+        *,
+        document_id: UUID,
+        field_values: dict[str, str],
+        actor_user_id: int,
+        allow_large_deviation: bool = False,
+        rename_file: bool = True,
+    ) -> str:
+        """Обновляет метаданные именования, каноническое имя и (опционально) файл на диске."""
+        from plans.canonical_edit import (
+            apply_naming_values,
+            auto_canonical_from_meta,
+            build_name_from_naming_values,
+            deviation_ok,
+            normalize_filename,
+            validate_naming_fields,
+        )
+
+        document = self.documents.get(document_id)
+        if not document:
+            raise DomainValidationError(_('Document not found'))
+        if document.document_type != DocumentType.PLX:
+            raise DomainValidationError(_('Canonical rename is only available for study plans'))
+        if not self.permissions.can_upload_version(actor_user_id, document):
+            raise DomainValidationError(_('User cannot rename this document'))
+
+        version = self.versions.get_active_version(document.id)
+        if version is None:
+            raise DomainValidationError(_('Document has no current version'))
+
+        errors = validate_naming_fields(field_values)
+        if errors:
+            raise DomainValidationError('; '.join(errors))
+
+        proposed = build_name_from_naming_values(field_values)
+        meta = dict(version.extracted_metadata or {})
+        auto_name = auto_canonical_from_meta(meta)
+        if not allow_large_deviation and not deviation_ok(auto_name, proposed):
+            raise DomainValidationError(
+                _(
+                    'Proposed name differs too much from the automatic canonical name. '
+                    'Adjust fields or confirm a large deviation.'
+                )
+            )
+
+        for other in self.documents.list_for_type(DocumentType.PLX):
+            if other.id == document.id:
+                continue
+            names = {normalize_filename(other.identity.canonical_name)}
+            names.update(normalize_filename(a) for a in other.identity.aliases)
+            if normalize_filename(proposed) in names:
+                raise DomainValidationError(
+                    _('Name «%(name)s» is already used by another plan') % {'name': proposed}
+                )
+
+        old_source = version.source_filename
+        old_canonical = document.identity.canonical_name
+        new_meta = apply_naming_values(meta, field_values)
+        new_key = version.storage_key
+
+        if rename_file and hasattr(self.storage, 'rename'):
+            try:
+                new_key = self.storage.rename(version.storage_key, proposed)
+            except FileExistsError as exc:
+                raise DomainValidationError(
+                    _('A file named «%(name)s» already exists in storage') % {'name': proposed}
+                ) from exc
+            except FileNotFoundError as exc:
+                raise DomainValidationError(_('Source file was not found in storage')) from exc
+
+        version.extracted_metadata = new_meta
+        version.source_filename = proposed
+        version.storage_key = new_key
+        version.updated_at = datetime.now()
+        self.versions.save(version)
+
+        document.identity = DocumentIdentity(
+            canonical_name=proposed,
+            aliases=document.identity.aliases,
+        )
+        document.updated_at = datetime.now()
+        self.documents.save(document)
+        self._merge_identity_aliases(document, old_source, old_canonical, proposed)
+
+        return proposed
+
     def transition_version_status(
         self,
         *,

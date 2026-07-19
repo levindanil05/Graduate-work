@@ -21,6 +21,18 @@
         .explanation-box { background: #f9f9f9; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
         pre.metadata { background: #f5f5f5; padding: 1rem; overflow-x: auto; }
         .errors { color: #b00020; }
+        .canon-box { border: 1px solid #ccc; border-radius: 4px; padding: 1rem; margin: 1rem 0; }
+        .canon-box.canon-warn { border-color: #c90; background: #fffbeb; }
+        .canon-ok { color: #176b2c; }
+        .canon-bad { color: #8a4b00; font-weight: bold; }
+        .canon-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+        .canon-fields label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+        .canon-fields input, .canon-fields select { padding: 0.35rem; }
+        .preview-line { margin: 0.75rem 0; }
+        .force-dev { display: block; margin: 0.5rem 0; }
+        .canon-actions { margin-top: 0.75rem; }
+        .canon-editor { margin-top: 0.75rem; }
+        .canon-editor summary { cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -57,6 +69,10 @@
         {% endfor %}
         {% endif %}
     </div>
+
+    {% if current_version and document.document_type == 'plx' and canonicity %}
+    {% include "plans/_canonical_name_editor.html" %}
+    {% endif %}
 
     <div class="explanation-box">
         <h2>Пояснение документа</h2>

@@ -7,6 +7,7 @@ from uuid import UUID
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
@@ -15,6 +16,7 @@ from documents.factory import build_document_service
 from documents.models import Document
 from documents.services import UploadRequest
 from documents.upload import ingest_plx_file
+from plans.canonical_edit import check_canonicity
 
 SESSION_UPLOAD_PATH = 'pending_plx_upload_path'
 SESSION_UPLOAD_NAME = 'pending_plx_upload_name'
@@ -29,10 +31,36 @@ def _clear_pending_upload(request) -> None:
         Path(pending).unlink()
 
 
+def _document_needs_name_fix(document_id: UUID) -> bool:
+    document = (
+        Document.objects.select_related('current_version')
+        .filter(pk=document_id)
+        .first()
+    )
+    if document is None or document.current_version is None:
+        return False
+    status = check_canonicity(
+        source_filename=document.current_version.source_filename,
+        document_canonical_name=document.canonical_name,
+        meta=document.current_version.extracted_metadata or {},
+    )
+    return not status.is_canonical
+
+
 def _redirect_after_upload(request, document_id: UUID | None):
-    if document_id:
-        return redirect('plans:document_detail', document_id=document_id)
-    return redirect('plans:plan_list')
+    if not document_id:
+        return redirect('plans:plan_list')
+    url = reverse('plans:document_detail', kwargs={'document_id': document_id})
+    if _document_needs_name_fix(document_id):
+        messages.warning(
+            request,
+            _(
+                'Uploaded file name does not match the canonical pattern. '
+                'Please review and apply the suggested name.'
+            ),
+        )
+        return redirect(f'{url}?edit_name=1')
+    return redirect(url)
 
 
 @staff_member_required
@@ -57,6 +85,7 @@ def upload_plx(request):
             target_document_id = UUID(preset_document_id)
 
         if force_new_from_pending and pending_path:
+            result = None
             try:
                 result = ingest_plx_file(
                     file_path=Path(pending_path),
@@ -72,7 +101,7 @@ def upload_plx(request):
                 messages.error(request, _('Upload error: %(error)s') % {'error': exc})
             finally:
                 _clear_pending_upload(request)
-            return redirect('plans:plan_list')
+            return _redirect_after_upload(request, result.document_id if result else None)
 
         if confirm_id and pending_path:
             try:
@@ -137,7 +166,7 @@ def upload_plx(request):
                     'status': result.status,
                 })
                 tmp_path.unlink(missing_ok=True)
-                return redirect('plans:plan_list')
+                return _redirect_after_upload(request, result.document_id)
 
             upload_request = UploadRequest(
                 user_id=request.user.id,
@@ -175,7 +204,7 @@ def upload_plx(request):
                 'status': result.status,
             })
             tmp_path.unlink(missing_ok=True)
-            return redirect('plans:plan_list')
+            return _redirect_after_upload(request, result.document_id)
         except Exception as exc:  # noqa: BLE001
             tmp_path.unlink(missing_ok=True)
             messages.error(request, _('Upload error: %(error)s') % {'error': exc})

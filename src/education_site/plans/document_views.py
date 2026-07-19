@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
 from documents.entities import VersionStatus
@@ -17,6 +18,13 @@ from documents.workflow_ui import (
     list_allowed_transitions,
     target_status_label,
     transition_label,
+)
+from plans.canonical_edit import (
+    NAMING_FIELD_SPECS,
+    build_preview_name,
+    check_canonicity,
+    naming_values_from_meta,
+    parse_naming_post,
 )
 
 
@@ -49,11 +57,28 @@ def _discussion_messages(version: DocumentVersion | None):
     return thread.messages.order_by('created_at')
 
 
+def _naming_form_fields(values: dict[str, str]):
+    return [
+        {
+            'key': spec.key,
+            'label': spec.label,
+            'choices': spec.choices,
+            'value': values.get(spec.key, ''),
+        }
+        for spec in NAMING_FIELD_SPECS
+    ]
+
+
 def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
     document = _get_document(document_id)
     current = document.current_version
     allowed_transitions = list_allowed_transitions(current.status) if current else []
     transition_choices = [(rule, transition_label(rule)) for rule in allowed_transitions]
+    open_name_editor = request.GET.get('edit_name') == '1'
+    naming_values = naming_values_from_meta(
+        (current.extracted_metadata if current else None) or {}
+    )
+    naming_from_post = False
 
     if request.method == 'POST' and request.user.is_staff:
         action = request.POST.get('action')
@@ -66,10 +91,29 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                     request.POST.get('explanation', ''),
                     request.user.id,
                 )
-                messages.success(request, 'Пояснение сохранено')
+                messages.success(request, _('Explanation saved'))
             except DomainValidationError as exc:
                 messages.error(request, str(exc))
             return redirect('plans:document_detail', document_id=document.id)
+
+        if action == 'canonical_rename' and current:
+            naming_values = parse_naming_post(request.POST)
+            naming_from_post = True
+            try:
+                new_name = service.apply_plx_canonical_rename(
+                    document_id=document.id,
+                    field_values=naming_values,
+                    actor_user_id=request.user.id,
+                    allow_large_deviation=request.POST.get('allow_large_deviation') == 'on',
+                )
+                messages.success(
+                    request,
+                    _('Name updated and file renamed to «%(name)s»') % {'name': new_name},
+                )
+                return redirect('plans:document_detail', document_id=document.id)
+            except DomainValidationError as exc:
+                messages.error(request, str(exc))
+                open_name_editor = True
 
         if action == 'discussion' and current:
             try:
@@ -78,10 +122,29 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                     author_user_id=request.user.id,
                     message=request.POST.get('message', ''),
                 )
-                messages.success(request, 'Сообщение добавлено')
+                messages.success(request, _('Discussion message added'))
             except DomainValidationError as exc:
                 messages.error(request, str(exc))
             return redirect(f'{request.path}?tab=discussion')
+
+    # После возможной ошибки переименования перечитаем документ.
+    document = _get_document(document_id)
+    current = document.current_version
+    meta = (current.extracted_metadata if current else None) or {}
+    is_plx = document.document_type == 'plx'
+    canonicity = None
+    naming_form_fields = []
+    preview_canonical_name = ''
+    if is_plx:
+        canonicity = check_canonicity(
+            source_filename=(current.source_filename if current else ''),
+            document_canonical_name=document.canonical_name,
+            meta=meta,
+        )
+        if not naming_from_post:
+            naming_values = naming_values_from_meta(meta)
+        naming_form_fields = _naming_form_fields(naming_values)
+        preview_canonical_name = build_preview_name(naming_values)
 
     tab = request.GET.get('tab', 'versions')
     return render(
@@ -95,6 +158,10 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'discussion_messages': _discussion_messages(current),
             'transition_choices': transition_choices,
             'tab': tab,
+            'canonicity': canonicity,
+            'naming_form_fields': naming_form_fields,
+            'preview_canonical_name': preview_canonical_name,
+            'open_name_editor': open_name_editor,
         },
     )
 

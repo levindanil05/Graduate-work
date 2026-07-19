@@ -48,6 +48,9 @@ class StoragePort(Protocol):
     def delete(self, storage_key: str) -> None:
         ...
 
+    def rename(self, storage_key: str, new_basename: str) -> str:
+        ...
+
 
 class MetadataExtractor(Protocol):
     def supports(self, document_type: DocumentType) -> bool:

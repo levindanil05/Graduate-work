@@ -56,5 +56,6 @@ class PlxMetadataExtractor:
             'department_abbr_ru': enriched.get('department_abbr_ru', ''),
             'profile_abbr_en': enriched.get('profile_abbr_en', ''),
             'profile_abbr_ru': enriched.get('profile_abbr_ru', ''),
-            'canonical_filename': build_canonical_name(enriched),
+            'canonical_filename': (canon := build_canonical_name(enriched)),
+            'canonical_filename_auto': canon,
         }

@@ -146,3 +146,122 @@ msgstr "Всегда создавать новый план (без сопост
 
 msgid "Upload"
 msgstr "Загрузить"
+
+# plans/canonical_edit.py — field labels and validation
+msgid "Direction code"
+msgstr "Код направления"
+
+msgid "Program kind (A/P/-)"
+msgstr "Вид программы (A/P/-)"
+
+msgid "Profile abbreviation (Latin)"
+msgstr "Аббревиатура профиля (лат.)"
+
+msgid "Study form (O/Z/V)"
+msgstr "Форма обучения (O/Z/V)"
+
+msgid "Term code"
+msgstr "Код срока обучения"
+
+msgid "Faculty abbreviation (Latin)"
+msgstr "Аббревиатура факультета (лат.)"
+
+msgid "Department abbreviation (Latin)"
+msgstr "Аббревиатура кафедры (лат.)"
+
+msgid "Admission year"
+msgstr "Год набора"
+
+msgid "Direction code must look like 08.03.01"
+msgstr "Код направления должен быть вида 08.03.01"
+
+msgid "Program kind must be A, P or -"
+msgstr "Вид программы должен быть A, P или -"
+
+msgid "Study form must be O, Z or V"
+msgstr "Форма обучения должна быть O, Z или V"
+
+msgid "Term code must be NOR, SOKR or 2VO"
+msgstr "Код срока должен быть NOR, SOKR или 2VO"
+
+msgid "Admission year must be a 4-digit number"
+msgstr "Год набора должен быть четырёхзначным числом"
+
+msgid "Abbreviation «%(field)s» must be Latin letters/digits (1–32)"
+msgstr "Аббревиатура «%(field)s» — латинские буквы/цифры (1–32 символа)"
+
+# documents/services.py — canonical rename
+msgid "Canonical rename is only available for study plans"
+msgstr "Переименование по канону доступно только для учебных планов"
+
+msgid "User cannot rename this document"
+msgstr "Пользователь не может переименовать этот документ"
+
+msgid "Document has no current version"
+msgstr "У документа нет текущей версии"
+
+msgid "Proposed name differs too much from the automatic canonical name. Adjust fields or confirm a large deviation."
+msgstr "Предлагаемое имя слишком сильно отличается от автоматически вычисленного. Измените поля или подтвердите сильное отклонение."
+
+msgid "Name «%(name)s» is already used by another plan"
+msgstr "Имя «%(name)s» уже используется другим планом"
+
+msgid "A file named «%(name)s» already exists in storage"
+msgstr "Файл с именем «%(name)s» уже есть в хранилище"
+
+msgid "Source file was not found in storage"
+msgstr "Исходный файл не найден в хранилище"
+
+# plans/document_views.py
+msgid "Explanation saved"
+msgstr "Пояснение сохранено"
+
+msgid "Name updated and file renamed to «%(name)s»"
+msgstr "Имя обновлено, файл переименован в «%(name)s»"
+
+msgid "Discussion message added"
+msgstr "Сообщение добавлено"
+
+# plans/upload_views.py — canonicity after upload
+msgid "Uploaded file name does not match the canonical pattern. Please review and apply the suggested name."
+msgstr "Имя загруженного файла не соответствует каноническому. Проверьте поля и примените предложенное имя."
+
+# plans/templates/plans/_canonical_name_editor.html
+msgid "File name and canonicity"
+msgstr "Имя файла и каноничность"
+
+msgid "Current name matches the canonical pattern."
+msgstr "Текущее имя соответствует каноническому шаблону."
+
+msgid "File:"
+msgstr "Файл:"
+
+msgid "Name does not match the canonical pattern."
+msgstr "Имя не соответствует каноническому шаблону."
+
+msgid "Current file:"
+msgstr "Текущий файл:"
+
+msgid "Plan name in database:"
+msgstr "Имя плана в базе:"
+
+msgid "Expected canonical name:"
+msgstr "Ожидаемое каноническое имя:"
+
+msgid "Automatic name from metadata:"
+msgstr "Автоматическое имя из метаданных:"
+
+msgid "Edit name via metadata fields"
+msgstr "Изменить имя через поля метаданных"
+
+msgid "Change the fields below — the file name is rebuilt from them. Direct free-form renaming is not used, so the name stays close to the canonical pattern."
+msgstr "Измените поля ниже — имя файла будет собрано из них. Свободное переименование не используется, поэтому имя остаётся близким к каноническому шаблону."
+
+msgid "Resulting name:"
+msgstr "Итоговое имя:"
+
+msgid "Allow large deviation from the automatic name (troubleshooting)"
+msgstr "Разрешить сильное отклонение от автоматического имени (для устранения неполадок)"
+
+msgid "Apply name and rename file"
+msgstr "Применить имя и переименовать файл"
