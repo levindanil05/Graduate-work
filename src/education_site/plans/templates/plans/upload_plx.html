@@ -1,34 +1,69 @@
+{% load i18n %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
-    <title>Загрузка PLX</title>
+    <title>{% trans "Upload study plan" %}</title>
     <style>
-        body { font-family: sans-serif; margin: 1.5rem; max-width: 720px; }
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 800px; }
         .match { border: 1px solid #ccc; padding: 0.75rem; margin: 0.5rem 0; border-radius: 4px; }
+        .match.exact { border-color: #2a7; background: #f4fff8; }
+        .reason { color: #555; font-size: 0.9rem; margin: 0.25rem 0; }
+        .meta { color: #333; font-size: 0.9rem; }
         label { display: block; margin: 0.5rem 0; }
+        .actions { margin-top: 1rem; }
     </style>
 </head>
 <body>
-    <h1>Загрузка учебного плана</h1>
-    <p><a href="{% url 'plans:plan_list' %}">← К списку</a></p>
+    <h1>{% trans "Upload study plan" %}</h1>
+    <p><a href="{% url 'plans:plan_list' %}">{% trans "← Back to list" %}</a></p>
 
-    {% if matches %}
-    <p>Файл <strong>{{ pending_name }}</strong> похож на существующие документы. Привязать к одному из них?</p>
-    {% for doc in matches %}
-    <form method="post" class="match">
+    {% if suggestions %}
+    <p>
+        {% trans "File" %} <strong>{{ pending_name }}</strong>
+        {% trans "may belong to an existing plan. Choose where to attach it, or create a new plan." %}
+    </p>
+    {% if pending_canonical %}
+    <p class="meta">{% trans "Canonical name from file:" %} <code>{{ pending_canonical }}</code></p>
+    {% endif %}
+
+    {% for item in suggestions %}
+    <form method="post" class="match {% if item.reason != 'metadata_approx' %}exact{% endif %}">
         {% csrf_token %}
-        <input type="hidden" name="confirm_document_id" value="{{ doc.id }}">
-        <strong>{{ doc.identity.canonical_name }}</strong>
-        <div>Алиасы: {{ doc.identity.aliases|join:", " }}</div>
-        <button type="submit">Привязать к этому документу</button>
+        <input type="hidden" name="confirm_document_id" value="{{ item.document_id }}">
+        <strong>{{ item.canonical_name }}</strong>
+        <div class="reason">
+            {% if item.reason == 'filename_exact' %}
+                {% trans "Exact filename match" %}
+            {% elif item.reason == 'canonical_exact' %}
+                {% trans "Exact canonical name match" %}
+            {% else %}
+                {% trans "Similar metadata" %}
+            {% endif %}
+            · {{ item.score_percent }}%
+        </div>
+        {% if item.meta_summary %}
+        <div class="meta">{{ item.meta_summary }}</div>
+        {% endif %}
+        {% if item.aliases %}
+        <div class="reason">{% trans "Aliases:" %} {{ item.aliases|join:", " }}</div>
+        {% endif %}
+        <button type="submit">{% trans "Attach to this plan" %}</button>
     </form>
     {% endfor %}
-    <p><a href="{% url 'plans:upload_plx' %}?cancel=1">Отменить и загрузить как новый документ</a></p>
+
+    <div class="actions">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="force_new_from_pending" value="1">
+            <button type="submit">{% trans "Create as new plan" %}</button>
+        </form>
+        <p><a href="{% url 'plans:upload_plx' %}?cancel=1">{% trans "Cancel upload" %}</a></p>
+    </div>
     {% else %}
     {% if preset_document %}
-    <p>Новая версия для документа: <strong>{{ preset_document.canonical_name }}</strong></p>
-    <p><a href="{% url 'plans:document_detail' preset_document.id %}">← К карточке</a></p>
+    <p>{% trans "New version for plan:" %} <strong>{{ preset_document.canonical_name }}</strong></p>
+    <p><a href="{% url 'plans:document_detail' preset_document.id %}">{% trans "← Back to card" %}</a></p>
     {% endif %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
@@ -36,14 +71,16 @@
         <input type="hidden" name="document_id" value="{{ preset_document.id }}">
         {% endif %}
         <label>
-            Файл .plx
+            {% trans ".plx file" %}
             <input type="file" name="plx_file" accept=".plx" required>
         </label>
+        {% if not preset_document %}
         <label>
             <input type="checkbox" name="force_new">
-            Всегда создавать новый документ (без сопоставления)
+            {% trans "Always create a new plan (skip matching)" %}
         </label>
-        <button type="submit">Загрузить</button>
+        {% endif %}
+        <button type="submit">{% trans "Upload" %}</button>
     </form>
     {% endif %}
 </body>

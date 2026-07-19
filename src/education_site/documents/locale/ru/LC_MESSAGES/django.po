@@ -83,3 +83,66 @@ msgstr "Восстановить"
 
 msgid "Hard delete"
 msgstr "Удалить физически"
+
+# documents/plx_identity.py — match reasons
+msgid "Exact filename match"
+msgstr "Совпадение имени файла"
+
+msgid "Exact canonical name match"
+msgstr "Совпадение канонического имени"
+
+msgid "Similar metadata"
+msgstr "Похожие метаданные"
+
+# plans/upload_views.py
+msgid "Uploaded: %(message)s (%(status)s)"
+msgstr "Загружено: %(message)s (%(status)s)"
+
+msgid "Upload error: %(error)s"
+msgstr "Ошибка загрузки: %(error)s"
+
+msgid "Select a .plx file"
+msgstr "Выберите файл .plx"
+
+# plans/templates/plans/upload_plx.html
+msgid "Upload study plan"
+msgstr "Загрузка учебного плана"
+
+msgid "← Back to list"
+msgstr "← К списку"
+
+msgid "File"
+msgstr "Файл"
+
+msgid "may belong to an existing plan. Choose where to attach it, or create a new plan."
+msgstr "возможно, относится к существующему плану. Выберите, к какому плану его привязать, или создайте новый."
+
+msgid "Canonical name from file:"
+msgstr "Каноническое имя из файла:"
+
+msgid "Aliases:"
+msgstr "Алиасы:"
+
+msgid "Attach to this plan"
+msgstr "Привязать к этому плану"
+
+msgid "Create as new plan"
+msgstr "Создать как новый план"
+
+msgid "Cancel upload"
+msgstr "Отменить загрузку"
+
+msgid "New version for plan:"
+msgstr "Новая версия для плана:"
+
+msgid "← Back to card"
+msgstr "← К карточке"
+
+msgid ".plx file"
+msgstr "Файл .plx"
+
+msgid "Always create a new plan (skip matching)"
+msgstr "Всегда создавать новый план (без сопоставления)"
+
+msgid "Upload"
+msgstr "Загрузить"

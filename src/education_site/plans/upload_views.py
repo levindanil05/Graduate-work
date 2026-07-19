@@ -7,6 +7,7 @@ from uuid import UUID
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
 from documents.entities import DocumentType
@@ -17,11 +18,13 @@ from documents.upload import ingest_plx_file
 
 SESSION_UPLOAD_PATH = 'pending_plx_upload_path'
 SESSION_UPLOAD_NAME = 'pending_plx_upload_name'
+SESSION_UPLOAD_CANON = 'pending_plx_upload_canon'
 
 
 def _clear_pending_upload(request) -> None:
     pending = request.session.pop(SESSION_UPLOAD_PATH, None)
     request.session.pop(SESSION_UPLOAD_NAME, None)
+    request.session.pop(SESSION_UPLOAD_CANON, None)
     if pending and Path(pending).exists():
         Path(pending).unlink()
 
@@ -35,7 +38,7 @@ def _redirect_after_upload(request, document_id: UUID | None):
 @staff_member_required
 @require_http_methods(['GET', 'POST'])
 def upload_plx(request):
-    """Загрузка PLX: matching, hash-dedup, parse → invalid."""
+    """Загрузка PLX: matching по имени/канону/метаданным, hash-dedup, parse → invalid."""
     service = build_document_service()
     preset_document_id = request.GET.get('document_id', '').strip() or request.POST.get('document_id', '').strip()
     preset_document = None
@@ -45,6 +48,7 @@ def upload_plx(request):
     if request.method == 'POST':
         confirm_id = request.POST.get('confirm_document_id', '').strip()
         force_new = request.POST.get('force_new') == 'on'
+        force_new_from_pending = request.POST.get('force_new_from_pending') == '1'
         pending_path = request.session.get(SESSION_UPLOAD_PATH)
         pending_name = request.session.get(SESSION_UPLOAD_NAME)
         target_document_id = UUID(confirm_id) if confirm_id else None
@@ -52,24 +56,47 @@ def upload_plx(request):
         if preset_document_id and not confirm_id and request.FILES.get('plx_file'):
             target_document_id = UUID(preset_document_id)
 
+        if force_new_from_pending and pending_path:
+            try:
+                result = ingest_plx_file(
+                    file_path=Path(pending_path),
+                    storage_key=pending_name or Path(pending_path).name,
+                    user_id=request.user.id,
+                    force_new=True,
+                )
+                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
+                    'message': result.message,
+                    'status': result.status,
+                })
+            except Exception as exc:  # noqa: BLE001
+                messages.error(request, _('Upload error: %(error)s') % {'error': exc})
+            finally:
+                _clear_pending_upload(request)
+            return redirect('plans:plan_list')
+
         if confirm_id and pending_path:
             try:
                 result = ingest_plx_file(
                     file_path=Path(pending_path),
-                    storage_key=pending_name,
+                    storage_key=pending_name or Path(pending_path).name,
                     user_id=request.user.id,
                     document_id=UUID(confirm_id),
+                    skip_filename_check=True,
+                    link_source_as_alias=True,
                 )
-                messages.success(request, f'Загружено: {result.message} ({result.status})')
-            except Exception as exc:
-                messages.error(request, f'Ошибка загрузки: {exc}')
+                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
+                    'message': result.message,
+                    'status': result.status,
+                })
+            except Exception as exc:  # noqa: BLE001
+                messages.error(request, _('Upload error: %(error)s') % {'error': exc})
             finally:
                 _clear_pending_upload(request)
             return _redirect_after_upload(request, UUID(confirm_id))
 
         uploaded = request.FILES.get('plx_file')
         if not uploaded:
-            messages.error(request, 'Выберите файл .plx')
+            messages.error(request, _('Select a .plx file'))
             return redirect('plans:upload_plx')
 
         _clear_pending_upload(request)
@@ -88,8 +115,13 @@ def upload_plx(request):
                     storage_key=storage_key,
                     user_id=request.user.id,
                     document_id=target_document_id,
+                    skip_filename_check=True,
+                    link_source_as_alias=True,
                 )
-                messages.success(request, f'Загружено: {result.message} ({result.status})')
+                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
+                    'message': result.message,
+                    'status': result.status,
+                })
                 tmp_path.unlink(missing_ok=True)
                 return _redirect_after_upload(request, target_document_id)
 
@@ -100,7 +132,10 @@ def upload_plx(request):
                     user_id=request.user.id,
                     force_new=True,
                 )
-                messages.success(request, f'Загружено: {result.message} ({result.status})')
+                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
+                    'message': result.message,
+                    'status': result.status,
+                })
                 tmp_path.unlink(missing_ok=True)
                 return redirect('plans:plan_list')
 
@@ -110,17 +145,21 @@ def upload_plx(request):
                 file_path=tmp_path,
                 source_filename=storage_key,
             )
-            matches = service.try_match_existing_document(upload_request)
+            match_ctx = service.suggest_document_matches(upload_request)
+            suggestions = match_ctx.suggestions
+            incoming_canon = match_ctx.incoming_canonical_filename
 
-            if matches:
+            if suggestions:
                 request.session[SESSION_UPLOAD_PATH] = str(tmp_path)
                 request.session[SESSION_UPLOAD_NAME] = storage_key
+                request.session[SESSION_UPLOAD_CANON] = incoming_canon
                 return render(
                     request,
                     'plans/upload_plx.html',
                     {
-                        'matches': matches,
+                        'suggestions': suggestions,
                         'pending_name': storage_key,
+                        'pending_canonical': incoming_canon,
                         'preset_document': preset_document,
                     },
                 )
@@ -131,14 +170,17 @@ def upload_plx(request):
                 user_id=request.user.id,
                 force_new=True,
             )
-            messages.success(request, f'Загружено: {result.message} ({result.status})')
+            messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
+                'message': result.message,
+                'status': result.status,
+            })
             tmp_path.unlink(missing_ok=True)
             return redirect('plans:plan_list')
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             tmp_path.unlink(missing_ok=True)
-            messages.error(request, f'Ошибка загрузки: {exc}')
+            messages.error(request, _('Upload error: %(error)s') % {'error': exc})
             if preset_document_id:
-                return redirect(f"{request.path}?document_id={preset_document_id}")
+                return redirect(f'{request.path}?document_id={preset_document_id}')
             return redirect('plans:upload_plx')
 
     if request.GET.get('cancel'):
@@ -151,8 +193,9 @@ def upload_plx(request):
         request,
         'plans/upload_plx.html',
         {
-            'matches': [],
+            'suggestions': [],
             'pending_name': '',
+            'pending_canonical': '',
             'preset_document': preset_document,
         },
     )

@@ -39,6 +39,10 @@ class UploadRequest:
     source_filename: str
     # Comment about uploaded changes (not discussion message).
     change_comment: str = ""
+    # Пользователь подтвердил привязку к документу — имя файла может отличаться.
+    skip_filename_check: bool = False
+    # Добавить исходное/каноническое имя в алиасы после успешной загрузки версии.
+    link_source_as_alias: bool = False
 
 
 @dataclass
@@ -97,27 +101,111 @@ class DocumentApplicationService:
                 return extractor
         return None
 
-    def try_match_existing_document(self, request: UploadRequest) -> list[Document]:
-        """Resolve candidates to confirm user intent before linking chain."""
+    def suggest_document_matches(self, request: UploadRequest):
+        """Кандидаты для подтверждения пользователем (PLX — по имени и метаданным)."""
+        from .plx_identity import MatchContext, MatchSuggestion, find_plx_suggestions
+
+        candidates = self.documents.list_for_type(request.document_type)
+        incoming_meta: dict = {}
+
+        if request.document_type == DocumentType.PLX:
+            extractor = self._resolve_metadata_extractor(request.document_type)
+            if extractor is not None:
+                try:
+                    incoming_meta = extractor.extract(request.file_path)
+                except Exception:  # noqa: BLE001
+                    incoming_meta = {}
+
+            versions_by_doc = {
+                doc.id: self.versions.get_active_version(doc.id) for doc in candidates
+            }
+            suggestions = find_plx_suggestions(
+                source_filename=request.source_filename,
+                incoming_meta=incoming_meta,
+                documents=candidates,
+                versions_by_doc=versions_by_doc,
+            )
+            return MatchContext(suggestions=suggestions, incoming_metadata=incoming_meta)
+
         strategy = self._resolve_naming_strategy(request.document_type)
-        candidates = self.documents.list_for_type(request.document_type)  # TODO perf: avoid listing all documents for each request.
         match = strategy.find_match(request.source_filename, candidates)
+        suggestions: list[MatchSuggestion] = []
         if match.matched_document_id is not None:
             matched = self.documents.get(match.matched_document_id)
-            return [matched] if matched else []
-        if not match.closest_document_ids:
-            return []
-        return [doc for doc_id in match.closest_document_ids if (doc := self.documents.get(doc_id))]
+            if matched:
+                suggestions.append(
+                    MatchSuggestion(
+                        document_id=matched.id,
+                        canonical_name=matched.identity.canonical_name,
+                        score=match.confidence,
+                        reason='filename_exact',
+                        aliases=matched.identity.aliases,
+                    )
+                )
+            return MatchContext(suggestions=suggestions, incoming_metadata={})
+        for doc_id in match.closest_document_ids:
+            doc = self.documents.get(doc_id)
+            if not doc:
+                continue
+            suggestions.append(
+                MatchSuggestion(
+                    document_id=doc.id,
+                    canonical_name=doc.identity.canonical_name,
+                    score=0.5,
+                    reason='metadata_approx',
+                    aliases=doc.identity.aliases,
+                )
+            )
+        return MatchContext(suggestions=suggestions, incoming_metadata={})
+
+    def try_match_existing_document(self, request: UploadRequest) -> list[Document]:
+        """Resolve candidates to confirm user intent before linking chain."""
+        suggestions = self.suggest_document_matches(request).suggestions
+        result: list[Document] = []
+        for suggestion in suggestions:
+            doc = self.documents.get(suggestion.document_id)
+            if doc is not None:
+                result.append(doc)
+        return result
+
+    def _merge_identity_aliases(self, document: Document, *names: str) -> Document:
+        aliases = set(document.identity.aliases)
+        for name in names:
+            cleaned = (name or '').strip()
+            if cleaned:
+                aliases.add(cleaned)
+                aliases.add(Path(cleaned).name)
+        document.identity = DocumentIdentity(
+            canonical_name=document.identity.canonical_name,
+            aliases=tuple(sorted(aliases)),
+        )
+        document.updated_at = datetime.now()
+        return self.documents.save(document)
 
     def upload_new_document(self, request: UploadRequest) -> UploadResult:
         """Create new document when no matching chain is confirmed."""
         strategy = self._resolve_naming_strategy(request.document_type)
         canonical_name = strategy.canonicalize(request.source_filename)
-        aliases = strategy.build_aliases(request.source_filename)
+        aliases = set(strategy.build_aliases(request.source_filename))
+
+        extractor = self._resolve_metadata_extractor(request.document_type)
+        if extractor is not None:
+            try:
+                metadata = extractor.extract(request.file_path)
+            except Exception:  # noqa: BLE001
+                metadata = {}
+            canon_from_meta = (metadata or {}).get('canonical_filename')
+            if isinstance(canon_from_meta, str) and canon_from_meta.strip():
+                canonical_name = canon_from_meta.strip()
+                aliases.add(canonical_name)
+                aliases.add(Path(canonical_name).name)
 
         document = Document(
             document_type=request.document_type,
-            identity=DocumentIdentity(canonical_name=canonical_name, aliases=aliases),
+            identity=DocumentIdentity(
+                canonical_name=canonical_name,
+                aliases=tuple(sorted(a for a in aliases if a)),
+            ),
             explanation="",
             created_at=datetime.now(),
             updated_at=datetime.now(),
@@ -135,7 +223,9 @@ class DocumentApplicationService:
         if not self.permissions.can_upload_version(request.user_id, document):
             raise DomainValidationError(_('Upload is not allowed for the current user'))
 
-        if not self.validate_filename_compatibility(document, request.source_filename):
+        if not request.skip_filename_check and not self.validate_filename_compatibility(
+            document, request.source_filename
+        ):
             raise DomainValidationError(_('Filename is not compatible with the document identity'))
 
         file_hash = self.hashing.hash_file(request.file_path)
@@ -178,6 +268,12 @@ class DocumentApplicationService:
         document.current_version_id = saved_version.id
         document.updated_at = datetime.now()
         self.documents.save(document)
+
+        if request.link_source_as_alias or request.skip_filename_check:
+            canon_meta = ''
+            if isinstance(metadata.get('canonical_filename'), str):
+                canon_meta = metadata['canonical_filename']
+            self._merge_identity_aliases(document, request.source_filename, canon_meta)
 
         if saved_version.status == VersionStatus.INVALID:
             first_error = saved_version.error_messages[0] if saved_version.error_messages else ""
