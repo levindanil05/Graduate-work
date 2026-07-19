@@ -5,10 +5,7 @@ from uuid import UUID
 
 from documents.entities import DocumentType
 from documents.factory import build_document_service
-from documents.infra.hashing import HashingService
-from documents.infra.storage import UserfilesStoragePort
 from documents.services import UploadRequest, UploadResult
-from documents.strategies import PlxNamingStrategy
 
 
 def ingest_plx_file(
@@ -52,61 +49,3 @@ def ingest_plx_file(
             return service.upload_new_version(exact[0].document_id, link_request)
 
     return service.upload_new_document(request)
-
-
-def plan_status_to_version_status(plan_status: str) -> str:
-    mapping = {
-        'draft': 'new',
-        'review': 'on_review',
-        'approved': 'approved',
-        'rejected': 'needs_fix',
-    }
-    return mapping.get(plan_status, 'new')
-
-
-def migrate_educational_plan_record(plan, *, storage: UserfilesStoragePort, hasher: HashingService) -> None:
-    """Create Document + v1 from legacy EducationalPlan row."""
-    from documents import models as orm
-
-    if orm.DocumentVersion.objects.filter(storage_key=plan.source_path).exists():
-        return
-
-    strategy = PlxNamingStrategy()
-    source_name = Path(plan.source_path).name
-    canonical = plan.source_path
-    aliases = set(strategy.build_aliases(plan.source_path))
-
-    document = orm.Document.objects.create(
-        document_type=orm.DocumentType.PLX,
-        canonical_name=canonical,
-        explanation=plan.comments or '',
-    )
-    for alias in aliases:
-        orm.DocumentAlias.objects.get_or_create(
-            alias=alias,
-            defaults={'document': document},
-        )
-
-    abs_path = storage.resolve_path(plan.source_path)
-    content_hash = hasher.hash_file(abs_path) if abs_path.exists() else ''
-
-    metadata = {
-        'direction_code': plan.direction_code,
-        'direction': plan.direction,
-        'faculty': plan.faculty,
-        'department': plan.department,
-        'year_start': plan.year_start,
-        'qualification': plan.qualification,
-    }
-
-    version = orm.DocumentVersion.objects.create(
-        document=document,
-        status=plan_status_to_version_status(plan.status),
-        version_number=1,
-        source_filename=source_name,
-        storage_key=plan.source_path,
-        content_hash=content_hash,
-        extracted_metadata=metadata,
-    )
-    document.current_version = version
-    document.save(update_fields=['current_version', 'updated_at'])
