@@ -13,7 +13,9 @@ sys.path.insert(0, str(REPO_ROOT / 'src' / 'education_site'))
 from plx_parser import parse_plx_file  # noqa: E402
 from plans.canonical_name import (  # noqa: E402
     build_canonical_name,
+    load_abbr_dict,
     reload_abbr_dict,
+    resolve_abbr,
     transliterate_ru,
 )
 
@@ -111,6 +113,48 @@ class TestBuildDoesNotReadFilename(unittest.TestCase):
         self.assertNotIn('_SOKR_', built)
         self.assertTrue(built.startswith('Ucheb_plan_09.03.04_A_'))
         self.assertIn('_O_NOR_', built)
+
+
+class TestGroupedFormsDict(unittest.TestCase):
+    def test_two_forms_same_en_ru(self):
+        import tempfile
+
+        yaml_text = """
+faculty:
+  - en: FTKM
+    ru: ФТКМ
+    forms:
+      - "технологии конструкционных материалов"
+      - "Факультет технологии конструкционных материалов"
+department: []
+profile: []
+"""
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.yaml',
+            delete=False,
+            encoding='utf-8',
+        ) as fh:
+            fh.write(yaml_text)
+            path = fh.name
+        try:
+            data = reload_abbr_dict(path)
+            a = resolve_abbr(
+                'faculty',
+                'технологии конструкционных материалов',
+                dict_data=data,
+            )
+            b = resolve_abbr(
+                'faculty',
+                'Факультет технологии конструкционных материалов',
+                dict_data=data,
+            )
+            self.assertEqual(a, {'en': 'FTKM', 'ru': 'ФТКМ'})
+            self.assertEqual(b, {'en': 'FTKM', 'ru': 'ФТКМ'})
+            self.assertEqual(a, b)
+        finally:
+            Path(path).unlink(missing_ok=True)
+            reload_abbr_dict()  # вернуть основной словарь
 
 
 if __name__ == '__main__':

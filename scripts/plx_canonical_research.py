@@ -206,12 +206,13 @@ def cmd_build_dict(files: list[Path], out_path: Path) -> int:
                 prof_ru[prof_name][raw] += 1
 
     def emit_section(title: str, en_map: dict, ru_map: dict) -> list[str]:
+        """Группирует формы с одинаковым en в одну сущность."""
         lines = [f'{title}:']
-        # sort by total count desc, then name
-        items = []
+        # form_name -> (n, en, ru)
+        form_rows: list[tuple[int, str, str, str]] = []
         for name, counter in en_map.items():
             total = sum(counter.values())
-            en, en_n = _majority(counter)
+            en, _ = _majority(counter)
             if len(counter) > 1:
                 conflicts.append(
                     f'{title}/{name!r}: {dict(counter)} -> majority {en!r}'
@@ -222,25 +223,53 @@ def cmd_build_dict(files: list[Path], out_path: Path) -> int:
                 if not ru:
                     ru = guess
                 elif guess and latin_abbr(ru) != en:
-                    # Сырое Сокращение не сходится с en — берём обратный транслит en
                     ru = guess
-            items.append((total, name, en, ru))
-        items.sort(key=lambda x: (-x[0], x[1].casefold()))
-        if not items:
-            lines.append('  {}')
+            form_rows.append((total, name, en, ru))
+
+        # en -> list of (n, form, ru_vote)
+        by_en: dict[str, list[tuple[int, str, str]]] = defaultdict(list)
+        for total, name, en, ru in form_rows:
+            if not en:
+                continue
+            by_en[en].append((total, name, ru))
+
+        entities: list[tuple[int, str, str, list[tuple[int, str]]]] = []
+        for en, forms in by_en.items():
+            entity_n = sum(n for n, _, _ in forms)
+            # ru сущности — majority по взвешенным голосам форм
+            ru_votes: Counter = Counter()
+            for n, _, ru in forms:
+                if ru:
+                    ru_votes[ru] += n
+            ru, _ = _majority(ru_votes)
+            if not ru and title in ('faculty', 'department'):
+                ru = cyrillic_abbr_guess(en)
+            form_list = sorted(
+                ((n, name) for n, name, _ in forms),
+                key=lambda x: (-x[0], x[1].casefold()),
+            )
+            entities.append((entity_n, en, ru, form_list))
+
+        entities.sort(key=lambda x: (-x[0], x[1]))
+        if not entities:
+            lines.append('  []')
             return lines
-        for total, name, en, ru in items:
-            key = name.replace('"', '\\"')
-            lines.append(f'  # n={total}')
-            lines.append(f'  "{key}":')
-            lines.append(f'    en: "{en}"')
+
+        for entity_n, en, ru, form_list in entities:
+            lines.append(f'  # n={entity_n}')
+            lines.append(f'  - en: "{en}"')
             lines.append(f'    ru: "{ru}"')
+            lines.append('    forms:')
+            for form_n, name in form_list:
+                key = name.replace('\\', '\\\\').replace('"', '\\"')
+                lines.append(f'      # n={form_n}')
+                lines.append(f'      - "{key}"')
         return lines
 
     header = [
-        '# Словарь аббревиатур PLX: полное имя → {en, ru}',
+        '# Словарь аббревиатур PLX: сущность → {en, ru, forms[]}',
+        '# forms — варианты полного имени из PLX; en/ru задаются один раз на сущность.',
         '# Комментарий # n=N — число вхождений в корпусе userfiles.',
-        '# en — токен имени файла; ru — подпись в UI (можно переопределять вручную).',
         '# Сгенерировано: scripts/plx_canonical_research.py build-dict',
         '',
     ]

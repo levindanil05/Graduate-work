@@ -96,6 +96,54 @@ def abbreviate_from_name(full_name: str) -> str:
     return ''.join(parts)
 
 
+def _register_form(
+    section_map: dict[str, dict[str, str]],
+    form: str,
+    en: str,
+    ru: str,
+) -> None:
+    key = normalize_name_key(form)
+    if not key:
+        return
+    section_map[key] = {'en': en, 'ru': ru}
+
+
+def _load_section_entries(section_data) -> dict[str, dict[str, str]]:
+    """
+    Разворачивает секцию словаря в lookup по нормализованной форме.
+    Поддерживает:
+      - list: [{en, ru, forms: [...]}, ...]  (новый формат)
+      - dict: {form: {en, ru}, ...}          (старый плоский формат)
+    """
+    out: dict[str, dict[str, str]] = {}
+    if isinstance(section_data, list):
+        for entity in section_data:
+            if not isinstance(entity, dict):
+                continue
+            en = str(entity.get('en') or '').strip()
+            ru = str(entity.get('ru') or '').strip()
+            forms = entity.get('forms') or []
+            if not isinstance(forms, list):
+                continue
+            for form in forms:
+                _register_form(out, str(form), en, ru)
+        return out
+
+    if isinstance(section_data, dict):
+        for key, value in section_data.items():
+            if not isinstance(value, dict):
+                continue
+            en = str(value.get('en') or '').strip()
+            ru = str(value.get('ru') or '').strip()
+            forms = value.get('forms')
+            if isinstance(forms, list) and forms:
+                for form in forms:
+                    _register_form(out, str(form), en, ru)
+            else:
+                _register_form(out, str(key), en, ru)
+    return out
+
+
 @lru_cache(maxsize=1)
 def load_abbr_dict(path: str | None = None) -> dict[str, dict[str, dict[str, str]]]:
     """
@@ -115,15 +163,7 @@ def load_abbr_dict(path: str | None = None) -> dict[str, dict[str, dict[str, str
         'profile': {},
     }
     for section in result:
-        section_data = raw.get(section) or {}
-        if not isinstance(section_data, dict):
-            continue
-        for key, value in section_data.items():
-            if not isinstance(value, dict):
-                continue
-            en = str(value.get('en') or '').strip()
-            ru = str(value.get('ru') or '').strip()
-            result[section][normalize_name_key(str(key))] = {'en': en, 'ru': ru}
+        result[section] = _load_section_entries(raw.get(section) or {})
     return result
 
 
