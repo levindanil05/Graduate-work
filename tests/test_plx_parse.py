@@ -3,6 +3,24 @@ import unittest
 
 from src.plx_parser import parse_plx_file
 
+_CORE_KEYS = (
+    'direction',
+    'direction_code',
+    'faculty',
+    'faculty_code',
+    'department',
+    'department_code',
+    'year_start',
+    'qualification',
+    'profiles',
+    'profile',
+    'disciplines',
+)
+
+
+def _core(result: dict) -> dict:
+    return {key: result.get(key) for key in _CORE_KEYS}
+
 
 class TestPlxParser(unittest.TestCase):
     def setUp(self):
@@ -27,7 +45,7 @@ class TestPlxParser(unittest.TestCase):
                 {'name': 'Экология', 'code': 'Б1.В.02', 'credits': '2'}  # noqa: RUF001
             ]
         }
-        self.assertEqual(result, expected)
+        self.assertEqual(_core(result), expected)
 
     def test_sample2_partial(self):
         file_path = os.path.join(self.data_dir, "sample2_partial.plx")
@@ -47,7 +65,7 @@ class TestPlxParser(unittest.TestCase):
                 {'name': 'Программирование', 'code': 'Б1.О.01', 'credits': '5'}  # noqa: RUF001
             ]
         }
-        self.assertEqual(result, expected)
+        self.assertEqual(_core(result), expected)
 
     def test_sample3_empty_disciplines(self):
         file_path = os.path.join(self.data_dir, "sample3_empty_disciplines.plx")
@@ -67,11 +85,10 @@ class TestPlxParser(unittest.TestCase):
         }
         self.assertEqual(result['direction'], expected['direction'])
         self.assertEqual(result['qualification'].lower(), expected['qualification'].lower())
-        result_copy = result.copy()
-        expected_copy = expected.copy()
-        result_copy['qualification'] = result_copy['qualification'].lower()
-        expected_copy['qualification'] = expected_copy['qualification'].lower()
-        self.assertEqual(result_copy, expected_copy)
+        core = _core(result)
+        core['qualification'] = core['qualification'].lower()
+        expected['qualification'] = expected['qualification'].lower()
+        self.assertEqual(core, expected)
 
     def test_sample4_invalid(self):
         file_path = os.path.join(self.data_dir, "sample4_invalid.plx")
@@ -94,7 +111,7 @@ class TestPlxParser(unittest.TestCase):
         self.assertEqual(result['department'], 'Электронно-вычислительные машины и системы')
         self.assertEqual(result['department_code'], '47')
         self.assertEqual(result['year_start'], '2020')
-        self.assertIn(result['qualification'], ('бакалавр', '2'))
+        self.assertIn(result['qualification'].casefold(), ('бакалавр', '2'))
         self.assertEqual(
             result['profile'],
             'Вычислительные машины, комплексы, системы и сети',

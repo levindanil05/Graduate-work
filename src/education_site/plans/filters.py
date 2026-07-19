@@ -10,13 +10,11 @@ class PlxDocumentFilter(django_filters.FilterSet):
         label='Статус',
     )
     faculty = django_filters.CharFilter(
-        field_name='extracted_metadata__faculty',
-        lookup_expr='icontains',
+        method='filter_faculty',
         label='Факультет',
     )
     department = django_filters.CharFilter(
-        field_name='extracted_metadata__department',
-        lookup_expr='icontains',
+        method='filter_department',
         label='Кафедра',
     )
     year_start = django_filters.NumberFilter(
@@ -39,6 +37,22 @@ class PlxDocumentFilter(django_filters.FilterSet):
         model = DocumentVersion
         fields = []
 
+    def filter_faculty(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(extracted_metadata__faculty_abbr_ru__icontains=value)
+            | Q(extracted_metadata__faculty__icontains=value)
+        )
+
+    def filter_department(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(extracted_metadata__department_abbr_ru__icontains=value)
+            | Q(extracted_metadata__department__icontains=value)
+        )
+
     def filter_q(self, queryset, name, value):
         if not value:
             return queryset
@@ -47,5 +61,7 @@ class PlxDocumentFilter(django_filters.FilterSet):
             | Q(extracted_metadata__direction__icontains=value)
             | Q(extracted_metadata__profile__icontains=value)
             | Q(extracted_metadata__faculty__icontains=value)
+            | Q(extracted_metadata__faculty_abbr_ru__icontains=value)
             | Q(extracted_metadata__department__icontains=value)
+            | Q(extracted_metadata__department_abbr_ru__icontains=value)
         )

@@ -113,10 +113,19 @@ class DocumentVersion(TimestampedModel):
 
     @property
     def faculty(self) -> str:
-        return self.meta_get('faculty')
+        # В UI — русская аббр., иначе полное имя (не латиница).
+        return self.meta_get('faculty_abbr_ru') or self.meta_get('faculty')
 
     @property
     def department(self) -> str:
+        return self.meta_get('department_abbr_ru') or self.meta_get('department')
+
+    @property
+    def faculty_full(self) -> str:
+        return self.meta_get('faculty')
+
+    @property
+    def department_full(self) -> str:
         return self.meta_get('department')
 
     @property
