@@ -36,6 +36,10 @@ def _decode_xml_bytes(content: bytes) -> str:
     return content.decode("utf-8", errors="replace")
 
 
+_MSDATA_NS = 'urn:schemas-microsoft-com:xml-msdata'
+_ROW_ORDER_ATTR = f'{{{_MSDATA_NS}}}rowOrder'
+
+
 def _nsmap_from_root(root: ET.Element) -> dict:
     """
     Возвращает namespace map для поиска, извлекая namespace из тега корня
@@ -47,6 +51,45 @@ def _nsmap_from_root(root: ET.Element) -> dict:
     return {"ds": "http://tempuri.org/dsMMISDB.xsd"}
 
 
+def _row_order(element: ET.Element) -> int:
+    raw = element.get(_ROW_ORDER_ATTR) or element.get('rowOrder') or '0'
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _extract_profiles(root: ET.Element, ns: dict) -> list[str]:
+    """Профили ООП с Используется=true, по возрастанию msdata:rowOrder."""
+    candidates: list[tuple[int, str]] = []
+    for oop in root.findall('.//ds:ООП', ns):
+        if (oop.get('Используется') or '').strip().lower() != 'true':
+            continue
+        name = (oop.get('Название') or '').strip()
+        if not name:
+            continue
+        candidates.append((_row_order(oop), name))
+    candidates.sort(key=lambda item: item[0])
+    return [name for _, name in candidates]
+
+
+def _empty_result(**extra) -> dict:
+    return {
+        'direction': '',
+        'direction_code': '',
+        'faculty': '',
+        'faculty_code': '',
+        'department': '',
+        'department_code': '',
+        'year_start': '',
+        'qualification': '',
+        'profiles': [],
+        'profile': '',
+        'disciplines': [],
+        **extra,
+    }
+
+
 def parse_plx_file(file) -> dict:
     """
     Парсит PLX файл и возвращает словарь с данными
@@ -55,7 +98,8 @@ def parse_plx_file(file) -> dict:
         file: файл (путь или UploadedFile)
 
     Returns:
-        dict с ключами: direction, faculty, department, year_start, qualifications
+        dict с ключами: direction, faculty, department, year_start, qualification,
+        profiles, profile, disciplines
     """
     try:
         # Читаем содержимое файла
@@ -70,17 +114,7 @@ def parse_plx_file(file) -> dict:
         root = ET.fromstring(xml_text)
         ns = _nsmap_from_root(root)
 
-        result = {
-            'direction': '',
-            'direction_code': '',
-            'faculty': '',
-            'faculty_code': '',
-            'department': '',
-            'department_code': '',
-            'year_start': '',
-            'qualification': '',
-            'disciplines': []
-        }
+        result = _empty_result()
 
         # === Извлекаем данные ООП (образовательная программа) ===
         oop = root.find('.//ds:ООП', ns)
@@ -88,6 +122,10 @@ def parse_plx_file(file) -> dict:
             result['direction_code'] = oop.get('Шифр', '')
             result['direction'] = oop.get('Название', '')
             result['qualification'] = oop.get('Квалификация', '')
+
+        profiles = _extract_profiles(root, ns)
+        result['profiles'] = profiles
+        result['profile'] = profiles[0] if profiles else ''
 
         # === Извлекаем данные Плана ===
         plan = root.find('.//ds:Планы', ns)
@@ -129,15 +167,4 @@ def parse_plx_file(file) -> dict:
         return result
 
     except Exception as e:
-        return {
-            'direction': '',
-            'direction_code': '',
-            'faculty': '',
-            'faculty_code': '',
-            'department': '',
-            'department_code': '',
-            'year_start': '',
-            'qualification': '',
-            'disciplines': [],
-            'error': str(e)
-        }
+        return _empty_result(error=str(e))

@@ -31,6 +31,7 @@ class PlxMetadataExtractor:
 
         year_str = data.get('year_start', '')
         year = int(year_str) if year_str and str(year_str).isdigit() else None
+        profiles = data.get('profiles') or []
         return {
             'direction_code': data.get('direction_code', ''),
             'direction': data.get('direction', ''),
@@ -38,4 +39,6 @@ class PlxMetadataExtractor:
             'department': data.get('department', ''),
             'year_start': year,
             'qualification': normalize_qualification(data.get('qualification', '')),
+            'profiles': profiles,
+            'profile': data.get('profile') or (profiles[0] if profiles else ''),
         }

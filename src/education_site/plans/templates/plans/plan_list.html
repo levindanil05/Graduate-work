@@ -88,6 +88,10 @@
             <label for="id_direction_code">Код направления</label>
             {{ filter.form.direction_code }}
         </div>
+        <div>
+            <label for="id_profile">Профиль</label>
+            {{ filter.form.profile }}
+        </div>
         <div class="filter-actions">
             <button type="submit">Применить фильтры</button>
             <a href="{% url 'plans:plan_list' %}">Сбросить</a>

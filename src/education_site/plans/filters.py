@@ -28,6 +28,11 @@ class PlxDocumentFilter(django_filters.FilterSet):
         lookup_expr='icontains',
         label='Код направления',
     )
+    profile = django_filters.CharFilter(
+        field_name='extracted_metadata__profile',
+        lookup_expr='icontains',
+        label='Профиль',
+    )
     q = django_filters.CharFilter(method='filter_q', label='Поиск')
 
     class Meta:
@@ -40,6 +45,7 @@ class PlxDocumentFilter(django_filters.FilterSet):
         return queryset.filter(
             Q(storage_key__icontains=value)
             | Q(extracted_metadata__direction__icontains=value)
+            | Q(extracted_metadata__profile__icontains=value)
             | Q(extracted_metadata__faculty__icontains=value)
             | Q(extracted_metadata__department__icontains=value)
         )

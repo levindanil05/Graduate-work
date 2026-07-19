@@ -29,6 +29,11 @@ class PlxDocumentTable(tables.Table):
         verbose_name='Направление',
         order_by='extracted_metadata__direction',
     )
+    profile = tables.Column(
+        accessor='profile',
+        verbose_name='Профиль',
+        order_by='extracted_metadata__profile',
+    )
     faculty = tables.Column(
         accessor='faculty',
         verbose_name='Факультет',
@@ -63,6 +68,7 @@ class PlxDocumentTable(tables.Table):
             'storage_key',
             'direction_code',
             'direction',
+            'profile',
             'faculty',
             'department',
             'year_start',

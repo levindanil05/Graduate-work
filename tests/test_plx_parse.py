@@ -20,6 +20,8 @@ class TestPlxParser(unittest.TestCase):
             'department_code': '48',
             'year_start': '2020',
             'qualification': 'бакалавр',
+            'profiles': [],
+            'profile': '',
             'disciplines': [
                 {'name': 'Экономика', 'code': 'Б1.В.01', 'credits': '3'},  # noqa: RUF001
                 {'name': 'Экология', 'code': 'Б1.В.02', 'credits': '2'}  # noqa: RUF001
@@ -39,6 +41,8 @@ class TestPlxParser(unittest.TestCase):
             'department_code': '9',
             'year_start': '2021',
             'qualification': 'бакалавр',
+            'profiles': [],
+            'profile': '',
             'disciplines': [
                 {'name': 'Программирование', 'code': 'Б1.О.01', 'credits': '5'}  # noqa: RUF001
             ]
@@ -57,6 +61,8 @@ class TestPlxParser(unittest.TestCase):
             'department_code': '24',
             'year_start': '2019',
             'qualification': 'бакалавр',
+            'profiles': [],
+            'profile': '',
             'disciplines': []
         }
         self.assertEqual(result['direction'], expected['direction'])
@@ -73,6 +79,8 @@ class TestPlxParser(unittest.TestCase):
         self.assertIn('error', result)
         self.assertEqual(result['direction'], '')
         self.assertEqual(result['disciplines'], [])
+        self.assertEqual(result['profiles'], [])
+        self.assertEqual(result['profile'], '')
         self.assertTrue(len(result['error']) > 0)
 
     def test_real_plx_file1(self):
@@ -87,6 +95,11 @@ class TestPlxParser(unittest.TestCase):
         self.assertEqual(result['department_code'], '47')
         self.assertEqual(result['year_start'], '2020')
         self.assertIn(result['qualification'], ('бакалавр', '2'))
+        self.assertEqual(
+            result['profile'],
+            'Вычислительные машины, комплексы, системы и сети',
+        )
+        self.assertEqual(result['profiles'], [result['profile']])
 
         self.assertGreater(len(result['disciplines']), 0)
 
@@ -145,6 +158,32 @@ class TestPlxParser(unittest.TestCase):
             if len(problems) > 30:
                 msg_lines.append(f"... and {len(problems) - 30} more")
             self.fail("\n".join(msg_lines))
+
+    def test_tek2_profiles_ordered_by_row_order(self):
+        """Профили с Используется=true, первый по msdata:rowOrder."""
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        file_path = os.path.join(
+            repo_root,
+            "userfiles",
+            "other",
+            "Ucheb_plan_09.04.01_A_TEK-2_O_NOR_FEVT_SAPR_2022.plx",
+        )
+        if not os.path.isfile(file_path):
+            self.skipTest(f"Нет файла: {file_path}")  # noqa: RUF001
+
+        result = parse_plx_file(file_path)
+        self.assertFalse(result.get('error'), result.get('error'))
+        self.assertEqual(
+            result['profile'],
+            'Интеллектуальные системы в проектировании и производстве',
+        )
+        self.assertEqual(result['profiles'][0], result['profile'])
+        self.assertEqual(len(result['profiles']), 11)
+        self.assertEqual(
+            result['profiles'][1],
+            'Облачная и сетевая инфраструктура систем искусственного интеллекта',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

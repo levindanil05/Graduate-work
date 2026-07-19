@@ -127,6 +127,16 @@ class DocumentVersion(TimestampedModel):
     def qualification(self) -> str:
         return self.meta_get('qualification')
 
+    @property
+    def profile(self) -> str:
+        return self.meta_get('profile')
+
+    @property
+    def profiles(self) -> list:
+        if not self.extracted_metadata:
+            return []
+        return list(self.extracted_metadata.get('profiles') or [])
+
 
 class DiscussionThread(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
