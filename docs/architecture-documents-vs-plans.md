@@ -1,7 +1,8 @@
-# Архитектура: documents (ядро) и plans (PLX-фасад)
+# Архитектура: documents (ядро), plans (PLX-фасад), external_sync (внешние хранилища)
 
 Документ фиксирует границу приложений, будущие типы документов (пока без кода) и концепцию связей `DocumentRelation`.  
-Связанное ТЗ: [planing-2605010.md](planing-2605010.md) §10.2.
+Связанное ТЗ: [planing-2605010.md](planing-2605010.md) §10.2.  
+Внешние облака и зеркала: [external-storage-sync.md](external-storage-sync.md).
 
 ---
 
@@ -9,14 +10,17 @@
 
 | Слой | Роль | Примеры |
 |------|------|---------|
-| **documents** | Универсальное ядро | `Document`, `DocumentVersion`, Alias, Workflow, Discussion; позже `DocumentRelation`; порты storage / hash / naming / extractor |
-| **plans** | PLX-фасад (тип «учебный план») | список и фильтры УП, upload PLX, parser, канонические имена, abbr dict, yandex |
+| **documents** | Универсальное ядро | `Document`, `DocumentVersion`, Alias, Workflow, Discussion; позже `DocumentRelation`; порты storage / hash / naming / extractor; указатель утверждённой версии |
+| **plans** | PLX-фасад (тип «учебный план») | список и фильтры УП, upload PLX, parser, канонические имена, abbr dict, `PlacementPolicy` (раскладка по папкам УО) |
+| **external_sync** | Согласование с внешними хранилищами | подключения, checkpoint, привязки реплик, запуски, исходящие намерения, рубильники, адаптер Яндекс.Диска |
 
 ### Правила
 
 1. Новые виды документов живут в той же системе `documents` (свой `document_type` + при необходимости тонкий UI-модуль рядом с `plans`).
-2. PLX-специфику **не** переносить в ядро `documents`.
+2. PLX-специфику **не** переносить в ядро `documents` (включая правила папок факультетов/архива на Яндекс.Диске — это `PlacementPolicy` в `plans`).
 3. Legacy-модель `EducationalPlan` удалена (миграция `plans.0008_remove_educationalplan`). Данные УП — только `Document` / `DocumentVersion`.
+4. Облачные SDK, OAuth и обход внешних каталогов живут в `external_sync`, не в `documents`. Изменения версий извне — только через прикладные операции ядра (доверенный импорт / публикация), не прямой записью ORM.
+5. Клиент `plans.yandex_client` и команда `update_from_yandex` — прототип односторонней загрузки; целевая реализация — адаптер и согласователь в `external_sync` ([external-storage-sync.md](external-storage-sync.md)).
 
 ### Имя типа учебного плана
 
@@ -27,11 +31,19 @@
 Код `plx` = учебный план (PLX). Переименовывать enum не требуется; в UI пользователю показывается «Учебный план», не идентификатор типа.
 
 ```text
-documents  ── универсальные операции (версия, статус, обсуждение, хранение)
-    ▲
-    │ использует
-plans      ── UI и логика именно для document_type = plx
+external_sync  ── внешние подключения, согласование, рубильники, отчёт запусков
+       │ вызывает
+documents      ── универсальные операции (версия, статус, обсуждение, хранение)
+       ▲
+       │ использует
+plans          ── UI и логика именно для document_type = plx, PlacementPolicy
 ```
+
+### PlacementPolicy и внешние копии
+
+Раскладка файлов по папкам учебного отдела (факультет, форма обучения, кафедра, `Архив`) — PLX-специфика: живёт в `plans` как `PlacementPolicy`. Согласователь в `external_sync` спрашивает политику «роль пути / куда положить / как назвать архив», но не содержит словаря аббревиатур и не разбирает PLX.
+
+Копия на Яндекс.Диске — `ExternalReplica` версии, не `DocumentRelation` и не `DocumentAlias`. Подробности моделей, рубильников и алгоритма: [external-storage-sync.md](external-storage-sync.md).
 
 ---
 
@@ -137,6 +149,7 @@ flowchart LR
 | `DocumentAlias` | Идентичность **одного** документа (имена файлов / алиасы), не связь между разными документами |
 | `documents.relationship_map` | Целостность внутренних ссылок (version↔document, thread↔version); не граф «связанных документов» |
 | `DocumentRelation` (будущее) | Связи между разными документами / версиями (производные, сопутствующие) |
+| `ExternalReplica` (`external_sync`) | Копия **той же** версии во внешнем каталоге (путь на Яндекс.Диске), не связь между документами |
 
 ---
 
@@ -147,3 +160,4 @@ flowchart LR
 | Cutover: данные УП на `Document`, `EducationalPlan` удалена | Модель и API `DocumentRelation` |
 | Граница apps и типы XLSX / ОПОП описаны здесь | Значения в `DocumentType`, UI загрузки связанных файлов |
 | Концепция связей зафиксирована | Хуки `approve` для derived-выгрузок |
+| Концепция `external_sync` и `PlacementPolicy` зафиксирована | Реализация по этапам в [external-storage-sync.md](external-storage-sync.md) §15 (указатель `approved_version`, неизменяемое хранение, рубильники, импорт/публикация) |
