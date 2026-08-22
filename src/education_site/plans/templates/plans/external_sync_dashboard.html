@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Синхронизация с внешним хранилищем</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 900px; }
+        .panel { border: 1px solid #ccc; border-radius: 4px; padding: 1rem; margin: 1rem 0; background: #f9f9f9; }
+        .messages { list-style: none; padding: 0; }
+        .messages li { padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+        .messages .success { background: #e6f4ea; }
+        .messages .error { background: #fce8e6; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+        .toolbar { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <p><a href="{% url 'plans:plan_list' %}">← К списку планов</a></p>
+    <h1>Синхронизация с внешним хранилищем</h1>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="panel">
+        <p>
+            <strong>Глобальный рубильник:</strong>
+            {% if sync_settings.external_sync_enabled %}
+                включена
+            {% else %}
+                выключена (<a href="/admin/external_sync/externalsyncsettings/">настроить в админке</a>)
+            {% endif %}
+        </p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Подключение</th>
+                <th>Режим</th>
+                <th>Получение</th>
+                <th>Отправка</th>
+                <th>Последний checkpoint</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for conn in connections %}
+            <tr>
+                <td>{{ conn.name }} (<code>{{ conn.slug }}</code>)</td>
+                <td>{{ conn.get_write_mode_display }}</td>
+                <td>{% if conn.pull_enabled %}вкл{% else %}выкл{% endif %}</td>
+                <td>{% if conn.push_enabled %}вкл{% else %}выкл{% endif %}</td>
+                <td>{{ conn.last_checkpoint_at|date:"d.m.Y H:i"|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if selected_connection %}
+    <form method="post" class="panel">
+        {% csrf_token %}
+        <label>
+            Подключение для прогона
+            <select name="connection">
+                {% for conn in connections %}
+                <option value="{{ conn.slug }}" {% if conn.slug == selected_connection.slug %}selected{% endif %}>
+                    {{ conn.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="toolbar">
+            <button type="submit" name="mode" value="pull">Запустить получение изменений</button>
+            {% if selected_connection.write_mode == 'read_write' %}
+            <button type="submit" name="mode" value="push">Отправить накопленные изменения</button>
+            <button type="submit" name="mode" value="full">Полное согласование</button>
+            {% endif %}
+        </div>
+        <p><small>Одновременно получать изменения может только одно подключение. Настройки — в <a href="/admin/external_sync/externalconnection/">админке</a>.</small></p>
+    </form>
+    {% endif %}
+
+    {% if last_run %}
+    <div class="panel">
+        <h2>Последний прогон</h2>
+        <p>
+            Статус: <strong>{{ last_run.get_status_display }}</strong>
+            · <a href="{% url 'plans:sync_run_detail' last_run.id %}">Подробный отчёт</a>
+        </p>
+        <p>
+            Импортировано: {{ last_run.imported_count }},
+            опубликовано: {{ last_run.published_count }},
+            дубликаты: {{ last_run.duplicates_count }},
+            ошибки: {{ last_run.errors_count }}
+        </p>
+        {% if last_run.stop_reason %}
+        <p>{{ last_run.stop_reason }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</body>
+</html>

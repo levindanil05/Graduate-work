@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django_tables2',
     'django_filters',
     'documents',
+    'external_sync',
     'plans',
 ]
 
@@ -132,9 +133,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# Яндекс.Диск
-YANDEX_DISK_TOKEN = os.getenv('YANDEX_DISK_TOKEN') 
-YANDEX_DISK_BASE_PATH = os.getenv('YANDEX_DISK_BASE_PATH') or '/'    # корень диска, где лежат папки факультетов
+# Яндекс.Диск (legacy — только для dev)
+YANDEX_DISK_TOKEN = os.getenv('YANDEX_DISK_TOKEN')
+YANDEX_DISK_BASE_PATH = os.getenv('YANDEX_DISK_BASE_PATH') or '/'
+
+# Два подключения внешней синхронизации
+YANDEX_DISK_UO_READONLY_TOKEN = os.getenv('YANDEX_DISK_UO_READONLY_TOKEN')
+YANDEX_DISK_UO_READONLY_BASE_PATH = os.getenv('YANDEX_DISK_UO_READONLY_BASE_PATH') or '/'
+YANDEX_DISK_MIKE_RW_TOKEN = os.getenv('YANDEX_DISK_MIKE_RW_TOKEN')
+YANDEX_DISK_MIKE_RW_BASE_PATH = os.getenv('YANDEX_DISK_MIKE_RW_BASE_PATH') or '/'
 
 # Папка для хранения скачанных учебных планов (относительно BASE_DIR)
 USERFILES_ROOT = BASE_DIR / 'userfiles'

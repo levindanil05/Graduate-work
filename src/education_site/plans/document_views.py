@@ -13,6 +13,9 @@ from documents.entities import VersionStatus
 from documents.factory import build_document_service
 from documents.infra.storage import UserfilesStoragePort
 from documents.models import DiscussionThread, Document, DocumentVersion, WorkflowTransition
+from external_sync.models import ExternalReplica
+from external_sync.registry import ConnectionRegistry
+from external_sync.ui_labels import replica_role_label, replica_sync_state_label
 from documents.services import DomainValidationError
 from documents.workflow_ui import (
     list_allowed_transitions,
@@ -30,7 +33,7 @@ from plans.canonical_edit import (
 
 def _get_document(document_id: UUID) -> Document:
     return get_object_or_404(
-        Document.objects.select_related('current_version').prefetch_related(
+        Document.objects.select_related('current_version', 'approved_version').prefetch_related(
             'versions',
             'aliases',
         ),
@@ -147,6 +150,30 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         preview_canonical_name = build_preview_name(naming_values)
 
     tab = request.GET.get('tab', 'versions')
+    version_ids = list(document.versions.values_list('id', flat=True))
+    external_replicas = (
+        ExternalReplica.objects.filter(version_id__in=version_ids)
+        .select_related('connection', 'version')
+        .order_by('connection__name', 'role', 'remote_path')
+    )
+    registry = ConnectionRegistry()
+    replica_rows = []
+    for replica in external_replicas:
+        browse_url = None
+        try:
+            provider = registry.build_provider(replica.connection)
+            browse_url = provider.browse_url(replica.remote_path)
+        except Exception:  # noqa: BLE001
+            browse_url = None
+        replica_rows.append(
+            {
+                'replica': replica,
+                'connection_name': replica.connection.name,
+                'role_label': replica_role_label(replica.role),
+                'state_label': replica_sync_state_label(replica.sync_state),
+                'browse_url': browse_url,
+            }
+        )
     return render(
         request,
         'plans/document_detail.html',
@@ -162,6 +189,8 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'naming_form_fields': naming_form_fields,
             'preview_canonical_name': preview_canonical_name,
             'open_name_editor': open_name_editor,
+            'external_replica_rows': replica_rows,
+            'approved_version': document.approved_version,
         },
     )
 

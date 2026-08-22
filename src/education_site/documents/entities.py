@@ -68,6 +68,7 @@ class Document:
     # Low-frequency fields that do not need dedicated indexed columns.
     extra_data: dict[str, Any] = field(default_factory=dict)
     current_version_id: UUID | None = None
+    approved_version_id: UUID | None = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 

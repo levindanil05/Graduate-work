@@ -29,6 +29,7 @@ def _to_domain_document(record: orm.Document) -> Document:
         explanation=record.explanation,
         extra_data=dict(record.extra_data or {}),
         current_version_id=record.current_version_id,
+        approved_version_id=record.approved_version_id,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -68,6 +69,7 @@ class DjangoDocumentRepository:
                 'explanation': document.explanation,
                 'extra_data': document.extra_data,
                 'current_version_id': document.current_version_id,
+                'approved_version_id': document.approved_version_id,
             },
         )
         desired_aliases = set(document.identity.aliases)
@@ -116,6 +118,15 @@ class DjangoVersionRepository:
         if document.current_version_id is None:
             return None
         return _to_domain_version(document.current_version)
+
+    def get_approved_version(self, document_id: UUID) -> DocumentVersion | None:
+        try:
+            document = orm.Document.objects.select_related('approved_version').get(pk=document_id)
+        except orm.Document.DoesNotExist:
+            return None
+        if document.approved_version_id is None:
+            return None
+        return _to_domain_version(document.approved_version)
 
     def get_by_hash(self, document_id: UUID, content_hash: str) -> DocumentVersion | None:
         record = (

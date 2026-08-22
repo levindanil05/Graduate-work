@@ -45,6 +45,14 @@ class Document(TimestampedModel):
         related_name='+',
         verbose_name='Текущая версия',
     )
+    approved_version = models.ForeignKey(
+        'DocumentVersion',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name='Утверждённая версия',
+    )
 
     class Meta:
         verbose_name = 'Документ'

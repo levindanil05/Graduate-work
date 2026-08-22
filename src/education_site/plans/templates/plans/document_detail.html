@@ -93,6 +93,7 @@
         <a href="?tab=workflow" class="{% if tab == 'workflow' %}active{% endif %}">Рабочий процесс</a>
         <a href="?tab=discussion" class="{% if tab == 'discussion' %}active{% endif %}">Обсуждение</a>
         <a href="?tab=metadata" class="{% if tab == 'metadata' %}active{% endif %}">Метаданные</a>
+        <a href="?tab=external" class="{% if tab == 'external' %}active{% endif %}">Внешние копии</a>
     </nav>
 
     {% if tab == 'versions' %}
@@ -166,6 +167,43 @@
         {% endif %}
     {% else %}
         <p>Нет текущей версии для обсуждения.</p>
+    {% endif %}
+    {% elif tab == 'external' %}
+    <h2>Внешние копии</h2>
+    {% if external_replica_rows %}
+    <table>
+        <thead>
+            <tr>
+                <th>Подключение</th>
+                <th>Путь</th>
+                <th>Роль</th>
+                <th>Состояние</th>
+                <th>Последнее согласование</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in external_replica_rows %}
+            <tr>
+                <td>{{ row.connection_name }}</td>
+                <td><code id="path-{{ forloop.counter }}">{{ row.replica.remote_path }}</code></td>
+                <td>{{ row.role_label }}</td>
+                <td>{{ row.state_label }}</td>
+                <td>{{ row.replica.last_reconciled_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                <td>
+                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('path-{{ forloop.counter }}').innerText)">Копировать путь</button>
+                    {% if row.browse_url %}
+                    · <a href="{{ row.browse_url }}" target="_blank" rel="noopener">Открыть на Яндекс.Диске</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif approved_version %}
+    <p>Копия во внешнем хранилище появится после утверждения и включённой отправки.</p>
+    {% else %}
+    <p>Внешних копий пока нет.</p>
     {% endif %}
     {% elif tab == 'metadata' %}
     {% if current_version %}

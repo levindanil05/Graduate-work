@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Отчёт синхронизации</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 900px; }
+        pre { background: #f5f5f5; padding: 1rem; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <p><a href="{% url 'plans:external_sync_dashboard' %}?connection={{ sync_run.connection.slug }}">← К синхронизации</a></p>
+    <h1>Отчёт прогона</h1>
+    <p>Подключение: {{ sync_run.connection.name }}</p>
+    <p>Статус: {{ sync_run.get_status_display }}</p>
+    <p>
+        Импортировано: {{ sync_run.imported_count }},
+        опубликовано: {{ sync_run.published_count }},
+        архивировано: {{ sync_run.archived_count }},
+        дубликаты: {{ sync_run.duplicates_count }},
+        конфликты: {{ sync_run.conflicts_count }},
+        пропущено: {{ sync_run.skipped_count }},
+        ошибки: {{ sync_run.errors_count }}
+    </p>
+    {% if sync_run.stop_reason %}
+    <p><strong>Причина остановки:</strong> {{ sync_run.stop_reason }}</p>
+    {% endif %}
+    <h2>Строки отчёта</h2>
+    <pre>{% for line in sync_run.report_lines %}{{ line }}
+{% empty %}Без изменений{% endfor %}</pre>
+</body>
+</html>

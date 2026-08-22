@@ -86,6 +86,9 @@ class VersionRepository(Protocol):
     def get_active_version(self, document_id: UUID) -> DocumentVersion | None:
         ...
 
+    def get_approved_version(self, document_id: UUID) -> DocumentVersion | None:
+        ...
+
     def get_by_hash(self, document_id: UUID, content_hash: str) -> DocumentVersion | None:
         ...
 

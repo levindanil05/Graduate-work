@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from django.db import transaction
 from django.utils.translation import gettext as _
 
 from .contracts import (
@@ -29,6 +30,8 @@ from .entities import (
     WorkflowTransition,
 )
 from .workflow_rules import get_rule
+
+SYNC_ACTOR_USER_ID = 0
 
 
 @dataclass
@@ -235,7 +238,11 @@ class DocumentApplicationService:
 
         current_versions = self.versions.list_for_document(document.id)
         next_version_number = (max((v.version_number for v in current_versions), default=0) + 1)
-        storage_key = self.storage.save(request.file_path, destination_name=request.source_filename)
+        version_id = uuid4()
+        from .infra.storage import UserfilesStoragePort
+
+        storage_key = UserfilesStoragePort.version_storage_key(document.id, version_id)
+        storage_key = self.storage.save(request.file_path, destination_name=storage_key)
 
         extractor = self._resolve_metadata_extractor(request.document_type)
         metadata: dict[str, object] = {}
@@ -250,6 +257,7 @@ class DocumentApplicationService:
                 parse_errors = (str(exc),)
 
         new_version = DocumentVersion(
+            id=version_id,
             document_id=document.id,
             status=status,
             version_number=next_version_number,
@@ -453,20 +461,287 @@ class DocumentApplicationService:
         if rule.requires_comment and not normalized_comment and not allow_without_comment:
             raise DomainValidationError(_('Comment is required for this transition'))
 
+        previous_approved_id: UUID | None = None
+        with transaction.atomic():
+            if target_status == VersionStatus.APPROVED:
+                previous_approved = self.versions.get_approved_version(document.id)
+                if previous_approved and previous_approved.id != version.id:
+                    self._archive_approved_version(
+                        previous_approved,
+                        actor_user_id=actor_user_id,
+                        action_comment=_('Superseded by a new approved version'),
+                    )
+                    previous_approved_id = previous_approved.id
+
+            transition = WorkflowTransition(
+                document_version_id=version.id,
+                from_status=version.status,
+                to_status=target_status,
+                action=rule.action,
+                action_comment=normalized_comment,
+                actor_user_id=actor_user_id,
+                created_at=datetime.now(),
+            )
+            self.workflow.save_transition(transition)
+
+            version.status = target_status
+            version.updated_at = datetime.now()
+            saved_version = self.versions.save(version)
+
+            document.current_version_id = saved_version.id
+            if target_status == VersionStatus.APPROVED:
+                document.approved_version_id = saved_version.id
+            document.updated_at = datetime.now()
+            self.documents.save(document)
+
+        if target_status == VersionStatus.APPROVED:
+            try:
+                from external_sync.hooks import on_version_approved
+
+                on_version_approved(
+                    document_id=document.id,
+                    version_id=saved_version.id,
+                    previous_approved_id=previous_approved_id,
+                )
+            except ImportError:
+                pass
+
+        return saved_version
+
+    def import_trusted_plx(
+        self,
+        *,
+        file_path: Path,
+        source_filename: str,
+        trusted_status: VersionStatus,
+        document_id: UUID | None = None,
+        actor_user_id: int = SYNC_ACTOR_USER_ID,
+        change_comment: str = '',
+    ) -> UploadResult:
+        """Trusted import from external storage (approved or archived, not draft)."""
+        if trusted_status not in (VersionStatus.APPROVED, VersionStatus.ARCHIVED):
+            raise DomainValidationError(
+                _('Trusted import supports only approved or archived status')
+            )
+
+        request = UploadRequest(
+            user_id=actor_user_id,
+            document_type=DocumentType.PLX,
+            file_path=file_path,
+            source_filename=source_filename,
+            change_comment=change_comment,
+            skip_filename_check=True,
+            link_source_as_alias=True,
+        )
+
+        if document_id is None:
+            suggestions = self.suggest_document_matches(request).suggestions
+            exact = [s for s in suggestions if s.reason in ('filename_exact', 'canonical_exact')]
+            if len(exact) == 1:
+                document_id = exact[0].document_id
+            elif len(exact) > 1:
+                return UploadResult(
+                    document_id=exact[0].document_id,
+                    version_id=None,
+                    status='ambiguous_match',
+                    message=_('Ambiguous match; manual review required'),
+                )
+
+        file_hash = self.hashing.hash_file(file_path)
+
+        if document_id is not None:
+            duplicate = self.versions.get_by_hash(document_id, file_hash)
+            if duplicate is not None:
+                document = self.documents.get(document_id)
+                if document and trusted_status == VersionStatus.APPROVED:
+                    document.current_version_id = duplicate.id
+                    document.approved_version_id = duplicate.id
+                    document.updated_at = datetime.now()
+                    self.documents.save(document)
+                return UploadResult(
+                    document_id=document_id,
+                    version_id=duplicate.id,
+                    status='already_exists',
+                    message=_('Duplicate content; existing version returned'),
+                )
+
+        with transaction.atomic():
+            if document_id is None:
+                document = self._create_trusted_document(request, file_hash, trusted_status)
+            else:
+                document = self.documents.get(document_id)
+                if document is None:
+                    raise DomainValidationError(_('Document not found'))
+                saved_version = self._create_trusted_version(
+                    document=document,
+                    request=request,
+                    file_hash=file_hash,
+                    trusted_status=trusted_status,
+                    actor_user_id=actor_user_id,
+                )
+                document = self.documents.get(document.id)
+                if document is None:
+                    raise DomainValidationError(_('Document not found'))
+                return UploadResult(
+                    document_id=document.id,
+                    version_id=saved_version.id,
+                    status=saved_version.status.value,
+                    message=_('Trusted version imported'),
+                )
+
+        return UploadResult(
+            document_id=document.id,
+            version_id=document.current_version_id,
+            status=trusted_status.value,
+            message=_('Trusted document imported'),
+        )
+
+    def _create_trusted_document(
+        self,
+        request: UploadRequest,
+        file_hash: str,
+        trusted_status: VersionStatus,
+    ) -> Document:
+        strategy = self._resolve_naming_strategy(request.document_type)
+        canonical_name = strategy.canonicalize(request.source_filename)
+        aliases = set(strategy.build_aliases(request.source_filename))
+        extractor = self._resolve_metadata_extractor(request.document_type)
+        metadata: dict[str, object] = {}
+        if extractor is not None:
+            try:
+                metadata = extractor.extract(request.file_path)
+            except Exception:  # noqa: BLE001
+                metadata = {}
+            canon_from_meta = (metadata or {}).get('canonical_filename')
+            if isinstance(canon_from_meta, str) and canon_from_meta.strip():
+                canonical_name = canon_from_meta.strip()
+                aliases.add(canonical_name)
+                aliases.add(Path(canonical_name).name)
+
+        document = Document(
+            document_type=request.document_type,
+            identity=DocumentIdentity(
+                canonical_name=canonical_name,
+                aliases=tuple(sorted(a for a in aliases if a)),
+            ),
+            explanation='',
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+        saved_document = self.documents.save(document)
+        self._create_trusted_version(
+            document=saved_document,
+            request=request,
+            file_hash=file_hash,
+            trusted_status=trusted_status,
+            actor_user_id=request.user_id,
+            metadata=metadata,
+        )
+        refreshed = self.documents.get(saved_document.id)
+        if refreshed is None:
+            raise DomainValidationError(_('Document not found'))
+        return refreshed
+
+    def _create_trusted_version(
+        self,
+        *,
+        document: Document,
+        request: UploadRequest,
+        file_hash: str,
+        trusted_status: VersionStatus,
+        actor_user_id: int,
+        metadata: dict[str, object] | None = None,
+    ) -> DocumentVersion:
+        from .infra.storage import UserfilesStoragePort
+
+        if trusted_status == VersionStatus.APPROVED:
+            previous_approved = self.versions.get_approved_version(document.id)
+            if previous_approved:
+                self._archive_approved_version(
+                    previous_approved,
+                    actor_user_id=actor_user_id,
+                    action_comment=_('Superseded by trusted external import'),
+                )
+
+        current_versions = self.versions.list_for_document(document.id)
+        next_version_number = (max((v.version_number for v in current_versions), default=0) + 1)
+        version_id = uuid4()
+        storage_key = UserfilesStoragePort.version_storage_key(document.id, version_id)
+        storage_key = self.storage.save(request.file_path, destination_name=storage_key)
+
+        if metadata is None:
+            metadata = {}
+            extractor = self._resolve_metadata_extractor(request.document_type)
+            if extractor is not None:
+                try:
+                    metadata = extractor.extract(request.file_path)
+                except Exception:  # noqa: BLE001
+                    metadata = {}
+
+        new_version = DocumentVersion(
+            id=version_id,
+            document_id=document.id,
+            status=trusted_status,
+            version_number=next_version_number,
+            source_filename=request.source_filename,
+            storage_key=storage_key,
+            content_hash=file_hash,
+            created_by_user_id=actor_user_id,
+            change_comment=request.change_comment,
+            extracted_metadata=metadata,
+            error_messages=(),
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+        saved_version = self.versions.save(new_version)
+
         transition = WorkflowTransition(
-            document_version_id=version.id,
-            from_status=version.status,
-            to_status=target_status,
-            action=rule.action,
-            action_comment=normalized_comment,
+            document_version_id=saved_version.id,
+            from_status=VersionStatus.NEW,
+            to_status=trusted_status,
+            action=WorkflowAction.APPROVE if trusted_status == VersionStatus.APPROVED else WorkflowAction.ARCHIVE,
+            action_comment=_('Trusted import from external storage'),
             actor_user_id=actor_user_id,
             created_at=datetime.now(),
         )
         self.workflow.save_transition(transition)
 
-        version.status = target_status
+        document.current_version_id = saved_version.id
+        if trusted_status == VersionStatus.APPROVED:
+            document.approved_version_id = saved_version.id
+        document.updated_at = datetime.now()
+        self.documents.save(document)
+        self._merge_identity_aliases(document, request.source_filename)
+        return saved_version
+
+    def _archive_approved_version(
+        self,
+        version: DocumentVersion,
+        *,
+        actor_user_id: int,
+        action_comment: str,
+    ) -> DocumentVersion:
+        if version.status != VersionStatus.APPROVED:
+            return version
+        transition = WorkflowTransition(
+            document_version_id=version.id,
+            from_status=version.status,
+            to_status=VersionStatus.ARCHIVED,
+            action=WorkflowAction.ARCHIVE,
+            action_comment=action_comment,
+            actor_user_id=actor_user_id,
+            created_at=datetime.now(),
+        )
+        self.workflow.save_transition(transition)
+        version.status = VersionStatus.ARCHIVED
         version.updated_at = datetime.now()
-        return self.versions.save(version)
+        saved = self.versions.save(version)
+        document = self.documents.get(version.document_id)
+        if document and document.approved_version_id == version.id:
+            document.approved_version_id = None
+            document.updated_at = datetime.now()
+            self.documents.save(document)
+        return saved
 
     def add_discussion_message(
         self, *, version_id: UUID, author_user_id: int, message: str

@@ -12,6 +12,10 @@ class UserfilesStoragePort:
     def __init__(self, root: Path | None = None) -> None:
         self.root = Path(root or settings.USERFILES_ROOT)
 
+    @staticmethod
+    def version_storage_key(document_id, version_id) -> str:
+        return f'documents/{document_id}/{version_id}.plx'
+
     def save(self, file_path: Path, destination_name: str) -> str:
         key = destination_name.replace('\\', '/').lstrip('/')
         dest = self.root / key
