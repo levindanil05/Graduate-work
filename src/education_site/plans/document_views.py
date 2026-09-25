@@ -3,25 +3,27 @@ from __future__ import annotations
 from uuid import UUID
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
+from accounts.decorators import user_can_edit_document, user_can_upload
+from documents.entities import DocumentVersion as DomainVersion
 from documents.entities import VersionStatus
 from documents.factory import build_document_service
 from documents.infra.storage import UserfilesStoragePort
 from documents.models import DiscussionThread, Document, DocumentVersion, WorkflowTransition
-from external_sync.models import ExternalReplica
-from external_sync.registry import ConnectionRegistry
-from external_sync.ui_labels import replica_role_label, replica_sync_state_label
 from documents.services import DomainValidationError
 from documents.workflow_ui import (
-    list_allowed_transitions,
+    list_allowed_transitions_for_user,
     target_status_label,
     transition_label,
 )
+from external_sync.models import ExternalReplica
+from external_sync.registry import ConnectionRegistry
+from external_sync.ui_labels import replica_role_label, replica_sync_state_label
 from plans.canonical_edit import (
     NAMING_FIELD_SPECS,
     build_preview_name,
@@ -72,18 +74,43 @@ def _naming_form_fields(values: dict[str, str]):
     ]
 
 
+def _domain_version_stub(orm_version: DocumentVersion) -> DomainVersion:
+    return DomainVersion(
+        id=orm_version.id,
+        document_id=orm_version.document_id,
+        status=VersionStatus(orm_version.status),
+        version_number=orm_version.version_number,
+        source_filename=orm_version.source_filename,
+        storage_key=orm_version.storage_key,
+        content_hash=orm_version.content_hash,
+    )
+
+
+def _transitions_for_request(request: HttpRequest, current: DocumentVersion | None):
+    if current is None or not request.user.is_authenticated:
+        return []
+    rules = list_allowed_transitions_for_user(
+        current.status,
+        user_id=request.user.pk,
+        version=_domain_version_stub(current),
+    )
+    return [(rule, transition_label(rule)) for rule in rules]
+
+
+@login_required
 def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
     document = _get_document(document_id)
     current = document.current_version
-    allowed_transitions = list_allowed_transitions(current.status) if current else []
-    transition_choices = [(rule, transition_label(rule)) for rule in allowed_transitions]
+    can_edit = user_can_edit_document(request)
+    can_upload = user_can_upload(request)
+    transition_choices = _transitions_for_request(request, current)
     open_name_editor = request.GET.get('edit_name') == '1'
     naming_values = naming_values_from_meta(
         (current.extracted_metadata if current else None) or {}
     )
     naming_from_post = False
 
-    if request.method == 'POST' and request.user.is_staff:
+    if request.method == 'POST' and can_edit:
         action = request.POST.get('action')
         service = build_document_service()
 
@@ -99,7 +126,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                 messages.error(request, str(exc))
             return redirect('plans:document_detail', document_id=document.id)
 
-        if action == 'canonical_rename' and current:
+        if action == 'canonical_rename' and current and can_upload:
             naming_values = parse_naming_post(request.POST)
             naming_from_post = True
             try:
@@ -130,7 +157,6 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                 messages.error(request, str(exc))
             return redirect(f'{request.path}?tab=discussion')
 
-    # После возможной ошибки переименования перечитаем документ.
     document = _get_document(document_id)
     current = document.current_version
     meta = (current.extracted_metadata if current else None) or {}
@@ -191,11 +217,13 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'open_name_editor': open_name_editor,
             'external_replica_rows': replica_rows,
             'approved_version': document.approved_version,
+            'can_edit': can_edit,
+            'can_upload': can_upload,
         },
     )
 
 
-@staff_member_required
+@login_required
 @require_http_methods(['GET', 'POST'])
 def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
     document = _get_document(document_id)
@@ -203,7 +231,12 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
     if current is None:
         raise Http404('У документа нет текущей версии')
 
-    allowed = list_allowed_transitions(current.status)
+    domain_version = _domain_version_stub(current)
+    allowed = list_allowed_transitions_for_user(
+        current.status,
+        user_id=request.user.pk,
+        version=domain_version,
+    )
     transition_choices = [
         (rule, transition_label(rule), target_status_label(rule.to_status))
         for rule in allowed
@@ -258,6 +291,7 @@ def _file_response(version: DocumentVersion) -> FileResponse:
     )
 
 
+@login_required
 def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
     document = _get_document(document_id)
     if document.current_version is None:
@@ -265,6 +299,7 @@ def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
     return _file_response(document.current_version)
 
 
+@login_required
 def download_version(request: HttpRequest, document_id: UUID, version_id: UUID) -> FileResponse:
     version = get_object_or_404(DocumentVersion, pk=version_id, document_id=document_id)
     return _file_response(version)

@@ -332,7 +332,7 @@ class DocumentApplicationService:
         document = self.documents.get(document_id)
         if not document:
             raise DomainValidationError(_('Document not found'))
-        if not self.permissions.can_upload_version(actor_user_id, document):
+        if not self.permissions.can_edit_document(actor_user_id, document):
             raise DomainValidationError(_('User cannot update the document explanation'))
         document.explanation = explanation.strip()
         document.updated_at = datetime.now()

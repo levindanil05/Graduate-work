@@ -5,7 +5,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('plans.urls')),  # Главная страница - твои учебные планы
+    path('accounts/', include('accounts.urls')),
+    path('', include('plans.urls')),
 ]
 
 # Это нужно для работы с файлами (чтобы можно было скачивать загруженные файлы)

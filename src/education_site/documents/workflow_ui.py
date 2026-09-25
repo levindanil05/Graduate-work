@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 
-from documents.entities import VersionStatus, WorkflowAction
+from documents.entities import DocumentVersion, VersionStatus, WorkflowAction
 from documents.models import VersionStatus as OrmVersionStatus
 from documents.workflow_rules import TransitionRule, list_rules_from
 
@@ -29,6 +29,24 @@ def _to_domain_status(status: str | VersionStatus) -> VersionStatus:
 
 def list_allowed_transitions(from_status: str | VersionStatus) -> list[TransitionRule]:
     return list_rules_from(_to_domain_status(from_status))
+
+
+def list_allowed_transitions_for_user(
+    from_status: str | VersionStatus,
+    *,
+    user_id: int | None,
+    version: DocumentVersion | None = None,
+) -> list[TransitionRule]:
+    """Переходы, разрешённые и статусом, и ролью пользователя."""
+    rules = list_allowed_transitions(from_status)
+    if user_id is None:
+        return []
+    from accounts.permissions import RolePermissionService
+
+    perms = RolePermissionService()
+    if version is None:
+        version = DocumentVersion(status=_to_domain_status(from_status))
+    return [rule for rule in rules if perms.can_transition(user_id, version, rule.to_status)]
 
 
 def transition_label(rule: TransitionRule) -> str:

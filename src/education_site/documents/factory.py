@@ -3,7 +3,6 @@ from __future__ import annotations
 from documents.infra.extractors import PlxMetadataExtractor
 from documents.infra.hashing import HashingService
 from documents.infra.storage import UserfilesStoragePort
-from documents.permissions import AllowAllPermissionService
 from documents.repos.django_repos import (
     DjangoDiscussionRepository,
     DjangoDocumentRepository,
@@ -15,6 +14,8 @@ from documents.strategies import GenericNamingStrategy, PlxNamingStrategy
 
 
 def build_document_service() -> DocumentApplicationService:
+    from accounts.permissions import RolePermissionService
+
     return DocumentApplicationService(
         documents=DjangoDocumentRepository(),
         versions=DjangoVersionRepository(),
@@ -24,5 +25,5 @@ def build_document_service() -> DocumentApplicationService:
         hashing=HashingService(),
         metadata_extractors=[PlxMetadataExtractor()],
         naming_strategies=[PlxNamingStrategy(), GenericNamingStrategy()],
-        permissions=AllowAllPermissionService(),
+        permissions=RolePermissionService(),
     )

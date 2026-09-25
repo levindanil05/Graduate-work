@@ -58,7 +58,9 @@
     <div class="toolbar">
         {% if current_version %}
         <a href="{% url 'plans:download_current' document.id %}">Скачать актуальную</a>
+        {% if can_upload %}
         <a href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую версию</a>
+        {% endif %}
         {% if transition_choices %}
         <a href="{% url 'plans:transition_status' document.id %}">Изменить статус</a>
         {% endif %}
@@ -70,13 +72,13 @@
         {% endif %}
     </div>
 
-    {% if current_version and document.document_type == 'plx' and canonicity %}
+    {% if current_version and document.document_type == 'plx' and canonicity and can_upload %}
     {% include "plans/_canonical_name_editor.html" %}
     {% endif %}
 
     <div class="explanation-box">
         <h2>Пояснение документа</h2>
-        {% if user.is_staff %}
+        {% if can_edit %}
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="explanation">
@@ -157,7 +159,7 @@
         {% empty %}
         <p>Сообщений пока нет.</p>
         {% endfor %}
-        {% if user.is_staff %}
+        {% if can_edit %}
         <form method="post" style="margin-top:1rem">
             {% csrf_token %}
             <input type="hidden" name="action" value="discussion">

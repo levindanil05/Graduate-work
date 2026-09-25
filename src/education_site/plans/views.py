@@ -1,10 +1,12 @@
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.core.management import call_command
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 from django_tables2 import RequestConfig
 
+from accounts.decorators import sync_required, user_can_manage_sync, user_can_upload
+from accounts.permissions import primary_role_display
 from documents.querysets import current_plx_versions
 from external_sync.models import ExternalConnection, ExternalSyncSettings, SyncRun
 
@@ -12,6 +14,7 @@ from .filters import PlxDocumentFilter
 from .tables import PlxDocumentTable
 
 
+@login_required
 def plan_list(request):
     """Список учебных планов (текущие версии документов PLX)."""
     queryset = current_plx_versions()
@@ -24,16 +27,20 @@ def plan_list(request):
         {
             'filter': filter_set,
             'table': table,
+            'can_upload': user_can_upload(request),
+            'can_manage_sync': user_can_manage_sync(request),
+            'user_role_label': primary_role_display(request.user.pk),
         },
     )
 
 
+@login_required
 def plan_add(request):
     """Добавление нового плана (через админку documents)."""
     return redirect('admin:documents_document_changelist')
 
 
-@staff_member_required
+@sync_required
 @require_http_methods(['GET', 'POST'])
 def external_sync_dashboard(request):
     connections = ExternalConnection.objects.order_by('slug')
@@ -74,7 +81,7 @@ def external_sync_dashboard(request):
     )
 
 
-@staff_member_required
+@sync_required
 def sync_run_detail(request, run_id):
     sync_run = get_object_or_404(SyncRun.objects.select_related('connection'), pk=run_id)
     return render(
@@ -86,7 +93,7 @@ def sync_run_detail(request, run_id):
     )
 
 
-@staff_member_required
+@sync_required
 def sync_yandex(request):
     """Устаревший URL — перенаправление на экран синхронизации."""
     return redirect('plans:external_sync_dashboard')

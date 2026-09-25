@@ -20,7 +20,7 @@
     </ul>
     {% endif %}
 
-    {% if user.is_staff %}
+    {% if can_upload %}
     <details class="canon-editor" {% if open_name_editor or not canonicity.is_canonical %}open{% endif %}>
         <summary>{% trans "Edit name via metadata fields" %}</summary>
         <p class="meta">

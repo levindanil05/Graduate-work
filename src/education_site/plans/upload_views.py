@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
+from accounts.decorators import upload_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext as _
@@ -63,7 +63,7 @@ def _redirect_after_upload(request, document_id: UUID | None):
     return redirect(url)
 
 
-@staff_member_required
+@upload_required
 @require_http_methods(['GET', 'POST'])
 def upload_plx(request):
     """Загрузка PLX: matching по имени/канону/метаданным, hash-dedup, parse → invalid."""

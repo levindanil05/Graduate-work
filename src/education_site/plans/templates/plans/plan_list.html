@@ -48,8 +48,20 @@
     <h1>Учебные планы</h1>
     <div class="toolbar">
         <a href="/admin/">Перейти в админку</a>
+        {% if can_upload %}
         <a href="{% url 'plans:upload_plx' %}">Загрузить PLX</a>
+        {% endif %}
+        {% if can_manage_sync %}
         <a href="{% url 'plans:external_sync_dashboard' %}">Синхронизация с внешним хранилищем</a>
+        {% endif %}
+        <span style="margin-left:auto">
+            {% if user.is_authenticated %}
+            {{ user.username }}{% if user_role_label %} ({{ user_role_label }}){% endif %}
+            · <a href="{% url 'accounts:logout' %}">Выйти</a>
+            {% else %}
+            <a href="{% url 'accounts:login' %}">Войти</a>
+            {% endif %}
+        </span>
     </div>
 
     {% if messages %}

@@ -131,3 +131,9 @@ class PermissionService(Protocol):
     def can_hard_delete(self, user_id: int, document: Document) -> bool:
         ...
 
+    def can_edit_document(self, user_id: int, document: Document | None = None) -> bool:
+        ...
+
+    def can_manage_sync(self, user_id: int) -> bool:
+        ...
+
