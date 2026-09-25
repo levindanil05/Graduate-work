@@ -458,7 +458,9 @@ flowchart TD
 - Retry с backoff на 429/5xx; повтор async operation Яндекса.
 - Ограничение параллелизма загрузок, чтобы не упереться в квоты.
 
-Токен: только env (`YANDEX_DISK_TOKEN` или secret store). В БД — `credential_ref`. Права OAuth: чтение и запись разрешённого корня (`cloud_api:disk.read` + `cloud_api:disk.write`). Папки приложения недостаточно, если каталог УО лежит в произвольном месте Диска.
+Токен: только env (`YANDEX_DISK_TOKEN` / `YANDEX_DISK_UO_READONLY_TOKEN` / `YANDEX_DISK_MIKE_RW_TOKEN` или secret store). В БД — `credential_ref`. Права OAuth: чтение и запись разрешённого корня (`cloud_api:disk.read` + `cloud_api:disk.write`). Папки приложения недостаточно, если каталог УО лежит в произвольном месте Диска.
+
+Пошаговая настройка (OAuth, путь, два подключения, первый прогон): [yandex-disk-howto.md](yandex-disk-howto.md).
 
 ---
 
