@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Диагностика подключения</title>
+    <style>
+        body { font-family: sans-serif; margin: 1.5rem; max-width: 960px; }
+        .panel { border: 1px solid #ccc; border-radius: 4px; padding: 1rem; margin: 1rem 0; background: #f9f9f9; }
+        .messages { list-style: none; padding: 0; }
+        .messages li { padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+        .messages .success { background: #e6f4ea; }
+        .messages .warning { background: #fff8e1; }
+        .messages .error { background: #fce8e6; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+        .status-ok { color: #176b2c; font-weight: bold; }
+        .status-fail { color: #b00020; font-weight: bold; }
+        .status-skip { color: #666; }
+        .status-warn { color: #8a4b00; font-weight: bold; }
+        .verdict-ok { background: #e6f4ea; }
+        .verdict-degraded { background: #fff8e1; }
+        .verdict-failed { background: #fce8e6; }
+        .toolbar { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; align-items: center; }
+    </style>
+</head>
+<body>
+    <p>
+        <a href="{% url 'plans:external_sync_dashboard' %}">← К синхронизации</a>
+        · <a href="{% url 'plans:plan_list' %}">К списку планов</a>
+    </p>
+    <h1>Диагностика подключения</h1>
+    <p>Короткая проверка API: токен, путь, содержимое верхнего уровня папки (без полного обхода всех файлов).</p>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="post" class="panel">
+        {% csrf_token %}
+        <div class="toolbar">
+            <label>
+                Подключение
+                <select name="connection">
+                    {% for conn in connections %}
+                    <option value="{{ conn.slug }}" {% if selected_connection and conn.slug == selected_connection.slug %}selected{% endif %}>
+                        {{ conn.name }} ({{ conn.slug }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit">Запустить диагностику</button>
+        </div>
+        {% if selected_connection %}
+        <p class="meta">
+            Путь: <code>{{ selected_connection.root_path }}</code>
+            · секрет: <code>{{ selected_connection.credential_ref }}</code>
+            · режим: {{ selected_connection.get_write_mode_display }}
+        </p>
+        {% endif %}
+    </form>
+
+    {% if report %}
+    <div class="panel verdict-{{ report.verdict }}">
+        <h2>Итог: {{ verdict_label }}</h2>
+        <p>Подключение: {{ report.connection_name }} (<code>{{ report.connection_slug }}</code>)</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Проверка</th>
+                <th>Статус</th>
+                <th>Подробности</th>
+                <th>мс</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for step in report.steps %}
+            <tr>
+                <td>{{ step.title }}</td>
+                <td class="status-{{ step.status }}">
+                    {% if step.status == 'ok' %}Успех
+                    {% elif step.status == 'fail' %}Ошибка
+                    {% elif step.status == 'warn' %}Предупреждение
+                    {% else %}Пропущено{% endif %}
+                </td>
+                <td>{{ step.detail }}</td>
+                <td>{% if step.duration_ms %}{{ step.duration_ms }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</body>
+</html>

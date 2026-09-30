@@ -10,6 +10,7 @@ urlpatterns = [
     path('upload/', upload_views.upload_plx, name='upload_plx'),
     path('sync-yandex/', views.sync_yandex, name='sync_yandex'),
     path('sync/', views.external_sync_dashboard, name='external_sync_dashboard'),
+    path('sync/diagnostics/', views.connection_diagnostics, name='connection_diagnostics'),
     path('sync/runs/<uuid:run_id>/', views.sync_run_detail, name='sync_run_detail'),
     path('doc/<uuid:document_id>/', document_views.document_detail, name='document_detail'),
     path('doc/<uuid:document_id>/transition/', document_views.transition_status, name='transition_status'),

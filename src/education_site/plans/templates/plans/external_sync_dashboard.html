@@ -16,7 +16,8 @@
     </style>
 </head>
 <body>
-    <p><a href="{% url 'plans:plan_list' %}">← К списку планов</a></p>
+    <p><a href="{% url 'plans:plan_list' %}">← К списку планов</a>
+       · <a href="{% url 'plans:connection_diagnostics' %}">Диагностика подключения</a></p>
     <h1>Синхронизация с внешним хранилищем</h1>
 
     {% if messages %}
@@ -81,7 +82,12 @@
             <button type="submit" name="mode" value="full">Полное согласование</button>
             {% endif %}
         </div>
-        <p><small>Одновременно получать изменения может только одно подключение. Настройки — в <a href="/admin/external_sync/externalconnection/">админке</a>.</small></p>
+        <p><small>
+            Одновременно получать изменения может только одно подключение.
+            Настройки — в <a href="/admin/external_sync/externalconnection/">админке</a>.
+            Перед полным прогоном удобно запустить
+            <a href="{% url 'plans:connection_diagnostics' %}{% if selected_connection %}?connection={{ selected_connection.slug }}{% endif %}">диагностику подключения</a>.
+        </small></p>
     </form>
     {% endif %}
 
