@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import time
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 import yadisk
 
@@ -18,11 +17,26 @@ def _parse_modified(value) -> datetime | None:
     return None
 
 
+def _strip_scheme(path: str) -> str:
+    """Убрать префикс disk:/trash: из путей YaDisk API → posix-путь от корня."""
+    path = (path or '').replace('\\', '/')
+    lower = path.lower()
+    for scheme in ('disk:', 'trash:'):
+        if lower.startswith(scheme):
+            path = path[len(scheme) :]
+            break
+    if not path.startswith('/'):
+        path = '/' + path if path else '/'
+    if path != '/' and path.endswith('/'):
+        path = path.rstrip('/')
+    return path or '/'
+
+
 class YandexDiskProvider(ExternalStorageProvider):
     def __init__(self, disk: yadisk.YaDisk, *, read_only: bool = False, root_path: str = '/') -> None:
         self.disk = disk
         self.read_only = read_only
-        self.root_path = root_path.rstrip('/') or '/'
+        self.root_path = _strip_scheme(root_path)
 
     @classmethod
     def from_connection(cls, connection: ExternalConnection, disk: yadisk.YaDisk) -> YandexDiskProvider:
@@ -37,19 +51,25 @@ class YandexDiskProvider(ExternalStorageProvider):
             raise ReadOnlyStorageError('Подключение только для чтения')
 
     def _to_remote_path(self, path: str) -> str:
-        path = path.replace('\\', '/')
-        if not path.startswith('/'):
-            path = '/' + path
+        path = _strip_scheme(path)
         if self.root_path != '/':
+            # Уже абсолютный путь внутри root — не дублировать префикс
+            base = self.root_path.rstrip('/')
+            if path == self.root_path or path.startswith(base + '/'):
+                return path
             if path == '/':
                 return self.root_path
-            return self.root_path.rstrip('/') + path
+            return base + path
         return path
 
     def _from_remote_path(self, absolute: str) -> str:
-        absolute = absolute.replace('\\', '/')
+        absolute = _strip_scheme(absolute)
         if self.root_path != '/':
             base = self.root_path.rstrip('/')
+            if absolute == self.root_path or absolute == base:
+                return '/'
+            if absolute.startswith(base + '/'):
+                return absolute[len(base) :]
             if absolute.startswith(base):
                 suffix = absolute[len(base) :]
                 return suffix if suffix.startswith('/') else '/' + suffix
@@ -65,9 +85,10 @@ class YandexDiskProvider(ExternalStorageProvider):
                 if not batch:
                     break
                 for item in batch:
+                    item_abs = _strip_scheme(getattr(item, 'path', '') or '')
                     if item.type == 'dir':
                         yield RemoteStat(
-                            path=self._from_remote_path(item.path),
+                            path=self._from_remote_path(item_abs),
                             name=item.name,
                             is_dir=True,
                             size=0,
@@ -75,10 +96,10 @@ class YandexDiskProvider(ExternalStorageProvider):
                             md5=None,
                             remote_id=getattr(item, 'resource_id', None) or getattr(item, 'md5', None),
                         )
-                        yield from walk(item.path)
+                        yield from walk(item_abs)
                     elif item.name.lower().endswith('.plx'):
                         yield RemoteStat(
-                            path=self._from_remote_path(item.path),
+                            path=self._from_remote_path(item_abs),
                             name=item.name,
                             is_dir=False,
                             size=int(getattr(item, 'size', 0) or 0),
