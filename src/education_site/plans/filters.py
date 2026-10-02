@@ -57,7 +57,8 @@ class PlxDocumentFilter(django_filters.FilterSet):
         if not value:
             return queryset
         return queryset.filter(
-            Q(storage_key__icontains=value)
+            Q(source_filename__icontains=value)
+            | Q(document__canonical_name__icontains=value)
             | Q(extracted_metadata__direction__icontains=value)
             | Q(extracted_metadata__profile__icontains=value)
             | Q(extracted_metadata__faculty__icontains=value)

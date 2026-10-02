@@ -18,7 +18,7 @@ class ActionsColumn(tables.Column):
 
 
 class PlxDocumentTable(tables.Table):
-    storage_key = tables.Column(verbose_name='Файл')
+    source_filename = tables.Column(verbose_name='Файл')
     direction_code = tables.Column(
         accessor='direction_code',
         verbose_name='Код направления',
@@ -65,7 +65,7 @@ class PlxDocumentTable(tables.Table):
     class Meta:
         model = DocumentVersion
         fields = (
-            'storage_key',
+            'source_filename',
             'direction_code',
             'direction',
             'profile',
