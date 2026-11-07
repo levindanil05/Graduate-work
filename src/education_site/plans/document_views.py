@@ -176,30 +176,40 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         preview_canonical_name = build_preview_name(naming_values)
 
     tab = request.GET.get('tab', 'versions')
-    version_ids = list(document.versions.values_list('id', flat=True))
-    external_replicas = (
-        ExternalReplica.objects.filter(version_id__in=version_ids)
-        .select_related('connection', 'version')
-        .order_by('connection__name', 'role', 'remote_path')
-    )
-    registry = ConnectionRegistry()
+    from accounts.permissions import user_can_see_external_replicas
+
+    show_external = user_can_see_external_replicas(request.user.pk)
+    if tab == 'external' and not show_external:
+        tab = 'versions'
+
     replica_rows = []
-    for replica in external_replicas:
-        browse_url = None
-        try:
-            provider = registry.build_provider(replica.connection)
-            browse_url = provider.browse_url(replica.remote_path)
-        except Exception:  # noqa: BLE001
-            browse_url = None
-        replica_rows.append(
-            {
-                'replica': replica,
-                'connection_name': replica.connection.name,
-                'role_label': replica_role_label(replica.role),
-                'state_label': replica_sync_state_label(replica.sync_state),
-                'browse_url': browse_url,
-            }
+    if show_external:
+        version_ids = list(document.versions.values_list('id', flat=True))
+        external_replicas = (
+            ExternalReplica.objects.filter(version_id__in=version_ids)
+            .select_related('connection', 'version')
+            .order_by('connection__name', 'role', 'remote_path')
         )
+        registry = ConnectionRegistry()
+        for replica in external_replicas:
+            browse_url = None
+            try:
+                provider = registry.build_provider(replica.connection)
+                browse_url = provider.browse_url(replica.remote_path)
+            except Exception:  # noqa: BLE001
+                browse_url = None
+            replica_rows.append(
+                {
+                    'replica': replica,
+                    'connection_name': replica.connection.name,
+                    'role_label': replica_role_label(replica.role),
+                    'state_label': replica_sync_state_label(replica.sync_state),
+                    'browse_url': browse_url,
+                }
+            )
+
+    from helpcenter.views import process_diagram_context
+
     return render(
         request,
         'plans/document_detail.html',
@@ -216,9 +226,13 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'preview_canonical_name': preview_canonical_name,
             'open_name_editor': open_name_editor,
             'external_replica_rows': replica_rows,
+            'show_external_replicas': show_external,
             'approved_version': document.approved_version,
             'can_edit': can_edit,
             'can_upload': can_upload,
+            'process_diagram': process_diagram_context(
+                current_status=current.status if current else None
+            ),
         },
     )
 
@@ -293,13 +307,24 @@ def _file_response(version: DocumentVersion) -> FileResponse:
 
 @login_required
 def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
+    from accounts.permissions import RolePermissionService
+    from django.core.exceptions import PermissionDenied
+
     document = _get_document(document_id)
     if document.current_version is None:
         raise Http404('Нет актуальной версии')
-    return _file_response(document.current_version)
+    version = document.current_version
+    if not RolePermissionService().can_download(request.user.pk, version):
+        raise PermissionDenied('Скачивание недоступно')
+    return _file_response(version)
 
 
 @login_required
 def download_version(request: HttpRequest, document_id: UUID, version_id: UUID) -> FileResponse:
+    from accounts.permissions import RolePermissionService
+    from django.core.exceptions import PermissionDenied
+
     version = get_object_or_404(DocumentVersion, pk=version_id, document_id=document_id)
+    if not RolePermissionService().can_download(request.user.pk, version):
+        raise PermissionDenied('Скачивание недоступно')
     return _file_response(version)

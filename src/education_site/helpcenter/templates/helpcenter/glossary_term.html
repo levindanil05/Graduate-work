@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}{{ term.title }}{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title=term.title subtitle=term.short %}
+
+<div class="card prose">
+    <p>{{ term.long }}</p>
+    {% include "ui/hint.html" with text=term.where label="Где встречается" %}
+</div>
+<p><a href="{% url 'helpcenter:glossary' %}">← К глоссарию</a></p>
+{% endblock %}

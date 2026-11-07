@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}О сервисе{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="О сервисе" %}
+
+<div class="card prose">
+    <p>{{ branding.product_name }} — внутренний сервис {{ branding.organization_short_name }} для согласования изменений в учебных планах.</p>
+    <p>Загружайте планы через пункт «Загрузить учебный план», отслеживайте статусы в реестре и используйте обсуждение в карточке документа.</p>
+    {% if branding.support_email %}
+    <p>По вопросам работы сервиса: <a href="mailto:{{ branding.support_email }}">{{ branding.support_email }}</a></p>
+    {% else %}
+    <p>Вопросы можно отправить через раздел <a href="{% url 'feedback:create' %}">обращений</a> (после входа).</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,38 +1,12 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.management import call_command
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
-from django_tables2 import RequestConfig
 
-from accounts.decorators import sync_required, user_can_manage_sync, user_can_upload
-from accounts.permissions import primary_role_display
-from documents.querysets import current_plx_versions
-from external_sync.models import ExternalConnection, ExternalSyncSettings, SyncRun
+from accounts.decorators import sync_required
+from external_sync.models import ExternalConnection, ExternalSyncSettings, SyncRun, SyncRunStatus
+from external_sync.services.queue_mode import encode_queue_idempotency_key
 from external_sync.services.diagnostics import VERDICT_LABELS, run_connection_diagnostics
-
-from .filters import PlxDocumentFilter
-from .tables import PlxDocumentTable
-
-
-@login_required
-def plan_list(request):
-    """Список учебных планов (текущие версии документов PLX)."""
-    queryset = current_plx_versions()
-    filter_set = PlxDocumentFilter(request.GET, queryset=queryset)
-    table = PlxDocumentTable(filter_set.qs)
-    RequestConfig(request, paginate=False).configure(table)
-    return render(
-        request,
-        'plans/plan_list.html',
-        {
-            'filter': filter_set,
-            'table': table,
-            'can_upload': user_can_upload(request),
-            'can_manage_sync': user_can_manage_sync(request),
-            'user_role_label': primary_role_display(request.user.pk),
-        },
-    )
 
 
 @login_required
@@ -57,17 +31,14 @@ def external_sync_dashboard(request):
 
     if request.method == 'POST' and selected:
         mode = request.POST.get('mode', 'full')
-        args = ['sync_external_storage', f'--connection={selected.slug}']
-        if mode == 'pull':
-            args.append('--pull-only')
-        elif mode == 'push':
-            args.append('--push-only')
-        try:
-            call_command(*args)
-            last_run = SyncRun.objects.filter(connection=selected).order_by('-created_at').first()
-            messages.success(request, 'Синхронизация завершена. Отчёт сохранён.')
-        except Exception as exc:
-            messages.error(request, f'Ошибка синхронизации: {exc}')
+        if mode not in {'full', 'pull', 'push'}:
+            mode = 'full'
+        SyncRun.objects.create(
+            connection=selected,
+            status=SyncRunStatus.QUEUED,
+            idempotency_key=encode_queue_idempotency_key(mode),
+        )
+        messages.success(request, 'Синхронизация поставлена в очередь. Обработка идёт в фоне.')
         return redirect(f'{request.path}?connection={selected.slug}')
 
     return render(

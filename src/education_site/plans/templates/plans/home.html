@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Главная" subtitle=branding.product_name %}
+
+<div class="stats-grid">
+    <div class="stat-tile">
+        <strong>{{ total_count }}</strong>
+        <span>всего в реестре</span>
+    </div>
+    {% for item in status_counts %}
+    <div class="stat-tile">
+        <strong>{{ item.count }}</strong>
+        <span>{{ item.label }}</span>
+    </div>
+    {% endfor %}
+    <div class="stat-tile">
+        <strong>{{ trash_count }}</strong>
+        <span>в корзине</span>
+    </div>
+</div>
+
+<div class="toolbar-row">
+    <a class="btn btn-primary" href="{% url 'plans:plan_list' %}">Открыть реестр планов</a>
+    {% if can_upload %}
+    <a class="btn btn-secondary" href="{% url 'plans:upload_plx' %}">Загрузить учебный план</a>
+    {% endif %}
+    <a class="btn btn-ghost" href="{% url 'plans:trash_list' %}">Корзина</a>
+    <a class="btn btn-ghost" href="{% url 'helpcenter:how_it_works' %}">Как это работает</a>
+</div>
+{% endblock %}

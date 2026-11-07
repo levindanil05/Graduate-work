@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Обращения пользователей{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Обращения пользователей" %}
+
+<form method="get" class="filters-inline">
+    <label for="id_status">Статус</label>
+    <select name="status" id="id_status">
+        <option value="">Все</option>
+        <option value="new" {% if status_filter == "new" %}selected{% endif %}>Новое</option>
+        <option value="in_progress" {% if status_filter == "in_progress" %}selected{% endif %}>В работе</option>
+        <option value="resolved" {% if status_filter == "resolved" %}selected{% endif %}>Решено</option>
+        <option value="rejected" {% if status_filter == "rejected" %}selected{% endif %}>Отклонено</option>
+    </select>
+    <button type="submit" class="btn btn-secondary">Фильтр</button>
+</form>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Автор</th>
+            <th>Тип</th>
+            <th>Тема</th>
+            <th>Статус</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in reports %}
+        <tr>
+            <td>{{ r.created_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ r.author.username }}</td>
+            <td>{{ r.get_kind_display }}</td>
+            <td>{{ r.subject }}</td>
+            <td>{{ r.get_status_display }}</td>
+            <td><a href="{% url 'feedback:staff_detail' r.pk %}">Открыть</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6">Нет обращений по выбранному фильтру.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

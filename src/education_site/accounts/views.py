@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.views import PasswordChangeView
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods
-
-from accounts.permissions import primary_role_display
 
 
 @require_http_methods(['GET', 'POST'])
 def login_view(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated:
-        return redirect('plans:plan_list')
+        return redirect('plans:home')
 
     error = ''
     if request.method == 'POST':
@@ -24,7 +25,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
             next_url = request.GET.get('next') or request.POST.get('next') or ''
             if next_url.startswith('/'):
                 return redirect(next_url)
-            return redirect('plans:plan_list')
+            return redirect('plans:home')
         error = 'Неверный логин или пароль'
 
     return render(
@@ -43,7 +44,7 @@ def logout_view(request: HttpRequest) -> HttpResponse:
     return redirect('accounts:login')
 
 
-def role_context(request: HttpRequest) -> dict:
-    if not request.user.is_authenticated:
-        return {'user_role_label': ''}
-    return {'user_role_label': primary_role_display(request.user.pk)}
+class UserPasswordChangeView(PasswordChangeView):
+    template_name = 'accounts/password_change.html'
+    success_url = reverse_lazy('plans:home')
+    form_class = PasswordChangeForm

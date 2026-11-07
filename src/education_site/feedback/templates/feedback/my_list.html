@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Мои обращения{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Мои обращения" %}
+<p class="toolbar-row">
+    <a class="btn btn-primary" href="{% url 'feedback:create' %}">Новое обращение</a>
+</p>
+{% if reports %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Тип</th>
+            <th>Тема</th>
+            <th>Статус</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in reports %}
+        <tr>
+            <td>{{ r.created_at|date:"d.m.Y H:i" }}</td>
+            <td>{{ r.get_kind_display }}</td>
+            <td>{{ r.subject }}</td>
+            <td>{{ r.get_status_display }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+{% url 'feedback:create' as feedback_create_url %}
+{% include "ui/empty_state.html" with message="Вы ещё не отправляли обращений." action_url=feedback_create_url action_label="Написать в поддержку" %}
+{% endif %}
+{% endblock %}

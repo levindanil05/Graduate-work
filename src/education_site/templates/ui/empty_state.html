@@ -1,0 +1,6 @@
+<div class="empty-state">
+    <p>{{ message|default:"Здесь пока ничего нет." }}</p>
+    {% if action_url and action_label %}
+    <p><a class="btn btn-primary" href="{{ action_url }}">{{ action_label }}</a></p>
+    {% endif %}
+</div>

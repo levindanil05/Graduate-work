@@ -1,0 +1,7 @@
+{% if messages %}
+<ul class="flash-messages" role="status">
+    {% for message in messages %}
+    <li class="flash flash-{{ message.tags|default:'info' }}">{{ message }}</li>
+    {% endfor %}
+</ul>
+{% endif %}

@@ -1,5 +1,5 @@
 {% load i18n %}
-<section class="canon-box {% if not canonicity.is_canonical %}canon-warn{% endif %}">
+<section class="card canon-box {% if not canonicity.is_canonical %}canon-warn{% endif %}">
     <h2>{% trans "File name and canonicity" %}</h2>
     {% if canonicity.is_canonical %}
     <p class="canon-ok">{% trans "Current name matches the canonical pattern." %}</p>
@@ -10,7 +10,7 @@
     <p class="canon-bad">
         {% trans "Name does not match the canonical pattern." %}
     </p>
-    <ul class="meta">
+    <ul class="meta link-list">
         <li>{% trans "Current file:" %} <code>{{ canonicity.current_filename }}</code></li>
         <li>{% trans "Plan name in database:" %} <code>{{ canonicity.document_canonical_name }}</code></li>
         <li>{% trans "Expected canonical name:" %} <code>{{ canonicity.expected_canonical }}</code></li>
@@ -23,16 +23,18 @@
     {% if can_upload %}
     <details class="canon-editor" {% if open_name_editor or not canonicity.is_canonical %}open{% endif %}>
         <summary>{% trans "Edit name via metadata fields" %}</summary>
-        <p class="meta">
+        <p class="hint-text">
             {% trans "Change the fields below — the file name is rebuilt from them. Direct free-form renaming is not used, so the name stays close to the canonical pattern." %}
         </p>
-        <form method="post" id="canonical-rename-form">
+        <form method="post" id="canonical-rename-form" class="form-stack">
             {% csrf_token %}
             <input type="hidden" name="action" value="canonical_rename">
             <div class="canon-fields">
                 {% for field in naming_form_fields %}
-                <label>
-                    {{ field.label }}
+                <p>
+                    <label>
+                        {{ field.label }}
+                    </label>
                     {% if field.choices %}
                     <select name="{{ field.key }}" data-token>
                         {% for choice in field.choices %}
@@ -42,19 +44,21 @@
                     {% else %}
                     <input type="text" name="{{ field.key }}" value="{{ field.value }}" data-token autocomplete="off">
                     {% endif %}
-                </label>
+                </p>
                 {% endfor %}
             </div>
             <p class="preview-line">
                 {% trans "Resulting name:" %}
                 <code id="canonical-preview">{{ preview_canonical_name }}</code>
             </p>
-            <label class="force-dev">
-                <input type="checkbox" name="allow_large_deviation">
-                {% trans "Allow large deviation from the automatic name (troubleshooting)" %}
-            </label>
-            <div class="canon-actions">
-                <button type="submit">{% trans "Apply name and rename file" %}</button>
+            <p>
+                <label class="force-dev">
+                    <input type="checkbox" name="allow_large_deviation">
+                    {% trans "Allow large deviation from the automatic name (troubleshooting)" %}
+                </label>
+            </p>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{% trans "Apply name and rename file" %}</button>
             </div>
         </form>
         <script>

@@ -7,6 +7,7 @@ import yadisk
 
 from external_sync.models import ExternalConnection, WriteMode
 from external_sync.ports import ExternalStorageProvider, ProviderCapabilities, ReadOnlyStorageError, RemoteStat
+from external_sync.providers.http_retry import call_with_backoff
 
 
 def _parse_modified(value) -> datetime | None:
@@ -37,6 +38,9 @@ class YandexDiskProvider(ExternalStorageProvider):
         self.disk = disk
         self.read_only = read_only
         self.root_path = _strip_scheme(root_path)
+
+    def _api(self, fn):
+        return call_with_backoff(fn)
 
     @classmethod
     def from_connection(cls, connection: ExternalConnection, disk: yadisk.YaDisk) -> YandexDiskProvider:
@@ -81,7 +85,7 @@ class YandexDiskProvider(ExternalStorageProvider):
         def walk(path: str):
             offset = 0
             while True:
-                batch = list(self.disk.listdir(path, limit=1000, offset=offset))
+                batch = list(self._api(lambda: self.disk.listdir(path, limit=1000, offset=offset)))
                 if not batch:
                     break
                 for item in batch:
@@ -115,7 +119,7 @@ class YandexDiskProvider(ExternalStorageProvider):
 
     def stat(self, path: str) -> RemoteStat:
         absolute = self._to_remote_path(path)
-        meta = self.disk.get_meta(absolute)
+        meta = self._api(lambda: self.disk.get_meta(absolute))
         return RemoteStat(
             path=self._from_remote_path(meta.path),
             name=meta.name,
@@ -128,7 +132,7 @@ class YandexDiskProvider(ExternalStorageProvider):
 
     def download(self, path: str, local_path: str) -> None:
         absolute = self._to_remote_path(path)
-        self.disk.download(absolute, local_path)
+        self._api(lambda: self.disk.download(absolute, local_path))
 
     def upload(self, local_path: str, dest_path: str, *, overwrite: bool = False) -> None:
         self._guard_write()
@@ -136,7 +140,7 @@ class YandexDiskProvider(ExternalStorageProvider):
         parent = str(PurePosixPath(absolute).parent)
         if parent and parent != '/':
             self.mkdirs(self._from_remote_path(parent))
-        self.disk.upload(local_path, absolute, overwrite=overwrite)
+        self._api(lambda: self.disk.upload(local_path, absolute, overwrite=overwrite))
 
     def move(self, from_path: str, to_path: str, *, overwrite: bool = False) -> None:
         self._guard_write()
@@ -145,7 +149,7 @@ class YandexDiskProvider(ExternalStorageProvider):
         parent = str(PurePosixPath(dst).parent)
         if parent and parent != '/':
             self.mkdirs(self._from_remote_path(parent))
-        self.disk.move(src, dst, overwrite=overwrite)
+        self._api(lambda: self.disk.move(src, dst, overwrite=overwrite))
 
     def mkdirs(self, path: str) -> None:
         self._guard_write()
@@ -157,8 +161,8 @@ class YandexDiskProvider(ExternalStorageProvider):
                 current = '/'
                 continue
             current = str(PurePosixPath(current) / part)
-            if not self.disk.exists(current):
-                self.disk.mkdir(current)
+            if not self._api(lambda: self.disk.exists(current)):
+                self._api(lambda: self.disk.mkdir(current))
 
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(
@@ -171,7 +175,7 @@ class YandexDiskProvider(ExternalStorageProvider):
     def browse_url(self, remote_path: str) -> str | None:
         try:
             absolute = self._to_remote_path(remote_path)
-            return self.disk.get_meta(absolute).href
+            return self._api(lambda: self.disk.get_meta(absolute).href)
         except Exception:  # noqa: BLE001
             return None
 

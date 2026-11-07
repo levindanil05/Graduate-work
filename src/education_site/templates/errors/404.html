@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block title %}Страница не найдена{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Страница не найдена" subtitle="Проверьте адрес или вернитесь на главную." %}
+<p><a href="{% url 'plans:home' %}">На главную</a></p>
+{% endblock %}

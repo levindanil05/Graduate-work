@@ -1,32 +1,26 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="utf-8">
-    <title>Вход в систему</title>
-    <style>
-        body { font-family: sans-serif; margin: 2rem auto; max-width: 360px; }
-        label { display: block; margin: 0.75rem 0 0.25rem; }
-        input { width: 100%; box-sizing: border-box; padding: 0.4rem; }
-        button { margin-top: 1rem; padding: 0.5rem 1rem; }
-        .error { color: #b00020; margin: 0.75rem 0; }
-    </style>
-</head>
-<body>
-    <h1>Вход в систему</h1>
-    {% if error %}
-    <p class="error">{{ error }}</p>
-    {% endif %}
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ next }}">
+{% extends "ui/auth_layout.html" %}
+
+{% block auth_title %}Вход в систему{% endblock %}
+
+{% block auth_content %}
+<h1 class="page-title" style="margin-top:0">Вход в систему</h1>
+{% if error %}
+<p class="field-error">{{ error }}</p>
+{% endif %}
+<form method="post" class="form-stack">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <p>
         <label for="id_username">Логин</label>
         <input id="id_username" name="username" autocomplete="username" required>
+    </p>
+    <p>
         <label for="id_password">Пароль</label>
         <input id="id_password" type="password" name="password" autocomplete="current-password" required>
-        <button type="submit">Войти</button>
-    </form>
-    <p style="margin-top:1.5rem;color:#555;font-size:0.9rem">
-        Самостоятельная регистрация отключена. Учётную запись создаёт администратор.
     </p>
-</body>
-</html>
+    <button type="submit" class="btn btn-primary" style="width:100%">Войти</button>
+</form>
+<p class="hint-box" style="margin-top:1.5rem;font-size:0.9rem">
+    Самостоятельная регистрация отключена. Учётную запись создаёт администратор.
+</p>
+{% endblock %}

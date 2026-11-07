@@ -1,0 +1,89 @@
+# Продакшен: bind web только на localhost; TLS и rate limit — на хостовом nginx (deploy/nginx/plans.conf).
+# Скопируйте src/education_site/.env.example в .env и задайте секреты.
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: src/education_site/Dockerfile
+  env_file:
+    - .env
+  environment:
+    DJANGO_SETTINGS_MODULE: education_site.settings
+  volumes:
+    - userfiles:/app/userfiles
+    - staticfiles:/app/staticfiles
+    - ./deploy/entrypoint.sh:/opt/deploy/entrypoint.sh:ro
+  depends_on:
+    db:
+      condition: service_healthy
+  entrypoint: ["/bin/bash", "/opt/deploy/entrypoint.sh"]
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-education_site}
+      POSTGRES_USER: ${POSTGRES_USER:-education_site}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-education_site} -d ${POSTGRES_DB:-education_site}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    <<: *app
+    restart: unless-stopped
+    command:
+      [
+        "gunicorn",
+        "education_site.wsgi:application",
+        "--bind",
+        "0.0.0.0:8000",
+        "--workers",
+        "3",
+        "--timeout",
+        "120",
+      ]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - userfiles:/app/userfiles
+      - staticfiles:/app/staticfiles
+      - ./deploy/entrypoint.sh:/opt/deploy/entrypoint.sh:ro
+
+  worker:
+    <<: *app
+    restart: unless-stopped
+    command:
+      [
+        "bash",
+        "-c",
+        "while true; do python manage.py run_external_sync_worker --once; python manage.py purge_trashed; sleep ${WORKER_SLEEP_SECONDS:-300}; done",
+      ]
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-education_site}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
+      PGDATABASE: ${POSTGRES_DB:-education_site}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - postgres_backups:/backups
+      - ./deploy/backup-loop.sh:/opt/backup-loop.sh:ro
+    entrypoint: ["/bin/bash", "/opt/backup-loop.sh"]
+
+volumes:
+  postgres_data:
+  postgres_backups:
+  userfiles:
+  staticfiles:

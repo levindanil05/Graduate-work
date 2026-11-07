@@ -1,113 +1,113 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="utf-8">
-    <title>Учебные планы</title>
-    <style>
-        body { font-family: sans-serif; margin: 1.5rem; }
-        h1 { margin-bottom: 0.5rem; }
-        .toolbar { margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-        .filters {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 0.75rem 1rem;
-            margin: 1rem 0;
-            padding: 1rem;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background: #f9f9f9;
-        }
-        .filters label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; }
-        .filters input, .filters select { width: 100%; box-sizing: border-box; }
-        .filter-actions { grid-column: 1 / -1; }
-        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-        th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
-        th a { color: inherit; text-decoration: none; }
-        th a:hover { text-decoration: underline; }
-        th.orderable a::after {
-            margin-left: 0.25rem;
-            color: #999;
-        }
-        th.asc a::after {
-            content: "↑";
-            color: #111;
-            font-weight: bold;
-        }
-        th.desc a::after {
-            content: "↓";
-            color: #111;
-            font-weight: bold;
-        }
-        .messages { list-style: none; padding: 0; }
-        .messages li { padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
-        .messages .success { background: #e6f4ea; }
-        .messages .error { background: #fce8e6; }
-    </style>
-</head>
-<body>
-    <h1>Учебные планы</h1>
-    <div class="toolbar">
-        <a href="/admin/">Перейти в админку</a>
-        {% if can_upload %}
-        <a href="{% url 'plans:upload_plx' %}">Загрузить PLX</a>
-        {% endif %}
-        {% if can_manage_sync %}
-        <a href="{% url 'plans:external_sync_dashboard' %}">Синхронизация с внешним хранилищем</a>
-        {% endif %}
-        <span style="margin-left:auto">
-            {% if user.is_authenticated %}
-            {{ user.username }}{% if user_role_label %} ({{ user_role_label }}){% endif %}
-            · <a href="{% url 'accounts:logout' %}">Выйти</a>
-            {% else %}
-            <a href="{% url 'accounts:login' %}">Войти</a>
-            {% endif %}
-        </span>
-    </div>
+{% extends "base.html" %}
 
-    {% if messages %}
-    <ul class="messages">
-        {% for message in messages %}
-        <li class="{{ message.tags }}">{{ message }}</li>
-        {% endfor %}
-    </ul>
+{% block title %}Реестр учебных планов{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Реестр учебных планов" %}
+
+<div class="toolbar-row">
+    {% if can_upload %}
+    <a class="btn btn-primary" href="{% url 'plans:upload_plx' %}">Загрузить учебный план</a>
     {% endif %}
+    <a class="btn btn-secondary" href="{% url 'plans:export_csv' %}?{{ query_string }}">Выгрузить CSV</a>
+    <a class="btn btn-secondary" href="{% url 'plans:export_xlsx' %}?{{ query_string }}">Выгрузить Excel</a>
+    <a class="btn btn-ghost" href="{% url 'plans:trash_list' %}">Корзина</a>
+</div>
 
-    <form method="get" class="filters">
-        <div>
-            <label for="id_q">Поиск</label>
-            {{ filter.form.q }}
-        </div>
-        <div>
-            <label for="id_status">Статус</label>
-            {{ filter.form.status }}
-        </div>
-        <div>
-            <label for="id_faculty">Факультет</label>
-            {{ filter.form.faculty }}
-        </div>
-        <div>
-            <label for="id_department">Кафедра</label>
-            {{ filter.form.department }}
-        </div>
-        <div>
-            <label for="id_year_start">Год начала</label>
-            {{ filter.form.year_start }}
-        </div>
-        <div>
-            <label for="id_direction_code">Код направления</label>
-            {{ filter.form.direction_code }}
-        </div>
-        <div>
-            <label for="id_profile">Профиль</label>
-            {{ filter.form.profile }}
-        </div>
-        <div class="filter-actions">
-            <button type="submit">Применить фильтры</button>
-            <a href="{% url 'plans:plan_list' %}">Сбросить</a>
-        </div>
-    </form>
+<form method="get" class="filters-panel">
+    <div>
+        <label for="id_q">Поиск</label>
+        {{ filter.form.q }}
+    </div>
+    <div>
+        <label for="id_status">Статус</label>
+        {{ filter.form.status }}
+    </div>
+    <div>
+        <label for="id_faculty">Факультет</label>
+        {{ filter.form.faculty }}
+    </div>
+    <div>
+        <label for="id_department">Кафедра</label>
+        {{ filter.form.department }}
+    </div>
+    <div>
+        <label for="id_year_start">Год начала</label>
+        {{ filter.form.year_start }}
+    </div>
+    <div>
+        <label for="id_direction_code">Код направления</label>
+        {{ filter.form.direction_code }}
+    </div>
+    <div>
+        <label for="id_profile">Профиль</label>
+        {{ filter.form.profile }}
+    </div>
+    <div style="grid-column: 1 / -1; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end;">
+        <button type="submit" class="btn btn-primary">Применить фильтры</button>
+        <a class="btn btn-ghost" href="{% url 'plans:plan_list' %}">Сбросить</a>
+        <label>
+            На странице
+            <select name="page_size" onchange="this.form.submit()">
+                <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+            </select>
+        </label>
+        {% if not show_all %}
+        <a class="btn btn-secondary" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}all=1">Показать всё</a>
+        {% else %}
+        <a class="btn btn-secondary" href="?{{ query_string }}">Включить постраничный вывод</a>
+        {% endif %}
+    </div>
+</form>
 
-    {% load django_tables2 %}
-    {% render_table table %}
-</body>
-</html>
+<form method="post" action="{% url 'plans:bulk_registry' %}">
+    {% csrf_token %}
+    <div class="toolbar-row">
+        <button type="submit" name="action" value="trash" class="btn btn-secondary">В корзину выбранные</button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th><span class="sr-only">Выбор</span></th>
+                <th>Файл</th>
+                <th>Код</th>
+                <th>Направление</th>
+                <th>Статус</th>
+                <th>Обновлён</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_rows %}
+            {% with v=row.record %}
+            <tr>
+                <td><input type="checkbox" name="version_ids" value="{{ v.pk }}"></td>
+                <td>{{ v.source_filename }}</td>
+                <td>{{ v.direction_code }}</td>
+                <td>{{ v.direction }}</td>
+                <td>{% include "ui/status_badge.html" with status=v.status label=v.get_status_display %}</td>
+                <td>{{ v.updated_at|date:"d.m.Y H:i" }}</td>
+                <td><a href="{% url 'plans:document_detail' v.document_id %}">Открыть</a></td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr><td colspan="7">Нет записей по заданным фильтрам.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+
+{% if table.page and not show_all %}
+<div class="pagination-bar">
+    {% if table.page.has_previous %}
+    <a href="?{{ query_string }}&amp;page={{ table.page.previous_page_number }}">Назад</a>
+    {% endif %}
+    <span>Страница {{ table.page.number }} из {{ table.page.paginator.num_pages }}</span>
+    {% if table.page.has_next %}
+    <a href="?{{ query_string }}&amp;page={{ table.page.next_page_number }}">Вперёд</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

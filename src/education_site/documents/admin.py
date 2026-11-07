@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .audit import ActionLog
 from .models import (
     DiscussionMessage,
     DiscussionThread,
@@ -57,3 +58,11 @@ admin.site.register(DiscussionThread)
 admin.site.register(DiscussionMessage)
 admin.site.register(WorkflowTransition)
 admin.site.register(DocumentTypeStrategy)
+
+
+@admin.register(ActionLog)
+class ActionLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'action', 'actor', 'object_type', 'object_id')
+    list_filter = ('action', 'object_type')
+    search_fields = ('object_id', 'action', 'metadata')
+    readonly_fields = ('created_at',)

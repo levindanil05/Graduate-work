@@ -1,0 +1,29 @@
+{% load static %}
+<header class="site-header">
+    <div class="container header-inner">
+        <a class="brand" href="{% url 'plans:home' %}">
+            <img src="{% static branding.logo_small %}" alt="" width="36" height="36">
+            <span class="brand-text">
+                <span class="brand-org">{{ branding.organization_short_name }}</span>
+                <span class="brand-product">{{ branding.product_short_name }}</span>
+            </span>
+        </a>
+        <nav class="main-nav" aria-label="Основное меню">
+            {% if user.is_authenticated %}
+            <a href="{% url 'plans:home' %}">Главная</a>
+            <a href="{% url 'plans:plan_list' %}">Реестр планов</a>
+            {% if nav_can_upload %}
+            <a href="{% url 'plans:upload_plx' %}">Загрузить учебный план</a>
+            {% endif %}
+            {% if nav_can_manage_sync %}
+            <a href="{% url 'plans:external_sync_dashboard' %}">Синхронизация</a>
+            {% endif %}
+            <a href="{% url 'feedback:create' %}">Обратная связь</a>
+            <a href="{% url 'helpcenter:index' %}">Справка</a>
+            {% else %}
+            <a href="{% url 'helpcenter:index' %}">Справка</a>
+            {% endif %}
+        </nav>
+        {% include "ui/account_menu.html" %}
+    </div>
+</header>

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
+
 from documents.entities import DocumentType
 
 QUALIFICATION_MAP = {
@@ -23,10 +25,11 @@ class PlxMetadataExtractor:
         return document_type == DocumentType.PLX
 
     def extract(self, file_path: Path) -> dict[str, Any]:
-        from plx_parser import parse_plx_file
+        from documents.infra.safe_parse import parse_plx_with_timeout
         from plans.canonical_name import build_canonical_name, enrich_meta_with_abbrs
 
-        data = parse_plx_file(str(file_path))
+        timeout = int(getattr(settings, 'PLX_PARSE_TIMEOUT_SECONDS', 10))
+        data = parse_plx_with_timeout(file_path, timeout_seconds=timeout)
         if data.get('error'):
             raise ValueError(data['error'])
 
@@ -34,13 +37,12 @@ class PlxMetadataExtractor:
         year = int(year_str) if year_str and str(year_str).isdigit() else None
         profiles = data.get('profiles') or []
         enriched = enrich_meta_with_abbrs(data)
-
+        canon = build_canonical_name(enriched)
         return {
             'direction_code': enriched.get('direction_code', ''),
             'direction': enriched.get('direction', ''),
             'faculty': enriched.get('faculty', ''),
             'department': enriched.get('department', ''),
-            'year_start': year,
             'qualification': normalize_qualification(enriched.get('qualification', '')),
             'profiles': profiles,
             'profile': enriched.get('profile') or (profiles[0] if profiles else ''),
@@ -56,6 +58,7 @@ class PlxMetadataExtractor:
             'department_abbr_ru': enriched.get('department_abbr_ru', ''),
             'profile_abbr_en': enriched.get('profile_abbr_en', ''),
             'profile_abbr_ru': enriched.get('profile_abbr_ru', ''),
-            'canonical_filename': (canon := build_canonical_name(enriched)),
+            'year_start': year,
+            'canonical_filename': canon,
             'canonical_filename_auto': canon,
         }

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Корзина{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Корзина" subtitle="Версии учебных планов, убранные из основного реестра." %}
+
+<form method="get" class="filters-panel">
+    <div>
+        <label for="id_q">Поиск</label>
+        {{ filter.form.q }}
+    </div>
+    <button type="submit" class="btn btn-primary">Найти</button>
+    <a class="btn btn-ghost" href="{% url 'plans:plan_list' %}">К реестру</a>
+</form>
+
+<p class="hint-line">Автоочистка через {{ trash_retention_days }} сут. после помещения в корзину; ниже — остаток до автоудаления.</p>
+
+<form id="trash-restore-form" method="post" action="{% url 'plans:bulk_registry' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="restore">
+    <div class="toolbar-row">
+        <button type="submit" class="btn btn-primary">Восстановить выбранные</button>
+    </div>
+</form>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Имя</th>
+                <th>Каноническое имя</th>
+                <th>Обновлён</th>
+                <th>До автоудаления</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            {% with v=row.version %}
+            <tr>
+                <td><input form="trash-restore-form" type="checkbox" name="version_ids" value="{{ v.pk }}"></td>
+                <td>{{ v.source_filename }}</td>
+                <td>{{ v.document.canonical_name }}</td>
+                <td>{{ v.updated_at|date:"d.m.Y H:i" }}</td>
+                <td>
+                    {% if row.days_remaining > 0 %}
+                        {{ row.days_remaining }} дн.
+                    {% else %}
+                        можно удалить
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'plans:document_detail' v.document_id %}">Открыть</a>
+                    {% if can_hard_delete %}
+                    <form method="post" action="{% url 'plans:hard_delete_document' v.document_id %}" class="inline-form" onsubmit="return confirm('Удалить документ и файлы безвозвратно?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Удалить физически</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr><td colspan="6">Корзина пуста.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination-bar">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}">Назад</a>
+    {% endif %}
+    <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">Вперёд</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

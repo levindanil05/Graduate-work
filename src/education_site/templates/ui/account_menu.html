@@ -1,0 +1,28 @@
+<div class="account-menu">
+    {% if user.is_authenticated %}
+    <details class="account-dropdown">
+        <summary class="account-summary">
+            <span class="account-avatar" aria-hidden="true">{{ user.username|slice:":1"|upper }}</span>
+            <span class="account-user">{{ user.get_full_name|default:user.username }}</span>
+            {% if user_role_label %}<span class="account-role">{{ user_role_label }}</span>{% endif %}
+        </summary>
+        <div class="account-panel">
+            <a href="{% url 'feedback:my_list' %}">Мои обращения</a>
+            <a href="{% url 'feedback:create' %}">Написать в поддержку</a>
+            {% if nav_can_manage_feedback %}
+            <a href="{% url 'feedback:staff_list' %}">Обращения пользователей</a>
+            {% endif %}
+            <a href="{% url 'accounts:password_change' %}">Сменить пароль</a>
+            {% if nav_is_admin %}
+            <a href="/{{ admin_url_path }}">Администрирование</a>
+            {% endif %}
+            <form method="post" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="link-button">Выйти</button>
+            </form>
+        </div>
+    </details>
+    {% else %}
+    <a class="btn btn-primary btn-sm" href="{% url 'accounts:login' %}">Войти</a>
+    {% endif %}
+</div>

@@ -1,0 +1,48 @@
+{% with d=diagram|default:process_diagram %}
+<div class="process-diagram card">
+    {% if d.stages %}
+    <ol class="process-stages">
+        {% for stage in d.stages %}
+        <li class="process-stage{% if stage.is_current %} is-current{% endif %}">
+            <span class="process-stage-label">{{ stage.label }}</span>
+            {% if stage.is_current %}<span class="process-stage-you">Вы здесь</span>{% endif %}
+        </li>
+        {% if not forloop.last %}<li class="process-arrow" aria-hidden="true">→</li>{% endif %}
+        {% endfor %}
+    </ol>
+    {% if d.side_stages %}
+    <ul class="process-side">
+        {% for stage in d.side_stages %}
+        <li class="process-stage{% if stage.is_current %} is-current{% endif %}">
+            {{ stage.label }}{% if stage.is_current %} — сейчас{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% endif %}
+
+    {% if d.transitions or transitions %}
+    <h3 class="process-table-title">Переходы статусов</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Из статуса</th>
+                <th>Действие</th>
+                <th>В статус</th>
+                <th>Комментарий</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in d.transitions|default:transitions %}
+            <tr>
+                <td>{{ row.from }}</td>
+                <td>{{ row.action }}</td>
+                <td>{{ row.to }}</td>
+                <td>{% if row.requires_comment %}обязателен{% else %}по желанию{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endwith %}

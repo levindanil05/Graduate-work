@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Глоссарий{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Глоссарий" %}
+
+<ul class="glossary-index">
+    {% for term in terms %}
+    <li>
+        <a href="{% url 'helpcenter:glossary_term' term.slug %}"><strong>{{ term.title }}</strong></a>
+        <span>{{ term.short }}</span>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

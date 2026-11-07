@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Справка{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Справка" subtitle="Краткие материалы по работе с сервисом согласования учебных планов." %}
+
+<div class="card-grid">
+    <a class="card card-link" href="{% url 'helpcenter:how_it_works' %}">
+        <h2>Как это работает</h2>
+        <p>Схема статусов и типовых действий согласования.</p>
+    </a>
+    <a class="card card-link" href="{% url 'helpcenter:glossary' %}">
+        <h2>Глоссарий</h2>
+        <p>Термины: документ, версия, синоним, реквизиты плана и др.</p>
+    </a>
+    <a class="card card-link" href="{% url 'helpcenter:about' %}">
+        <h2>О сервисе</h2>
+        <p>Назначение системы и контакты поддержки.</p>
+    </a>
+</div>
+
+<h2 class="section-title">Популярные термины</h2>
+<ul class="link-list">
+    {% for term in terms %}
+    <li><a href="{% url 'helpcenter:glossary_term' term.slug %}">{{ term.title }}</a> — {{ term.short }}</li>
+    {% endfor %}
+</ul>
+{% endblock %}

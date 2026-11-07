@@ -488,6 +488,25 @@ class DocumentApplicationService:
             version.updated_at = datetime.now()
             saved_version = self.versions.save(version)
 
+            try:
+                from documents.audit import log_action
+                from django.contrib.auth import get_user_model
+
+                actor = get_user_model().objects.filter(pk=actor_user_id).first()
+                log_action(
+                    action=f'workflow_{rule.action.value}',
+                    actor=actor,
+                    object_type='document_version',
+                    object_id=str(version.id),
+                    metadata={
+                        'from': str(transition.from_status),
+                        'to': str(target_status),
+                        'document_id': str(document.id),
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
             document.current_version_id = saved_version.id
             if target_status == VersionStatus.APPROVED:
                 document.approved_version_id = saved_version.id
@@ -788,3 +807,42 @@ class DocumentApplicationService:
         )
         self.workflow.save_transition(transition)
         return saved
+
+    def hard_delete_document(self, *, document_id: UUID, actor_user_id: int) -> None:
+        """Безвозвратное удаление документа, версий и файлов в USERFILES_ROOT."""
+        from documents import models as orm
+        from documents.audit import log_action
+
+        document = self.documents.get(document_id)
+        if document is None:
+            raise DomainValidationError(_('Document not found'))
+
+        if not self.permissions.can_hard_delete(actor_user_id, document):
+            raise DomainValidationError(_('Hard delete is not allowed for the current user'))
+
+        record = orm.Document.objects.filter(pk=document_id).prefetch_related('versions').first()
+        if record is None:
+            raise DomainValidationError(_('Document not found'))
+
+        storage_keys = [v.storage_key for v in record.versions.all() if v.storage_key]
+        canonical = record.canonical_name
+        record_id = str(record.pk)
+
+        record.delete()
+
+        for key in storage_keys:
+            try:
+                self.storage.delete(key)
+            except OSError:
+                pass
+
+        from django.contrib.auth import get_user_model
+
+        actor = get_user_model().objects.filter(pk=actor_user_id).first()
+        log_action(
+            action=WorkflowAction.HARD_DELETE.value,
+            actor=actor,
+            object_type='document',
+            object_id=record_id,
+            metadata={'canonical_name': canonical, 'storage_keys': storage_keys},
+        )

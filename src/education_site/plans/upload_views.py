@@ -127,6 +127,19 @@ def upload_plx(request):
         if not uploaded:
             messages.error(request, _('Select a .plx file'))
             return redirect('plans:upload_plx')
+        from django.conf import settings as dj_settings
+
+        name_lower = (uploaded.name or '').lower()
+        if not name_lower.endswith('.plx'):
+            messages.error(request, _('Select a .plx file'))
+            return redirect('plans:upload_plx')
+        max_bytes = int(getattr(dj_settings, 'PLX_UPLOAD_MAX_BYTES', 50 * 1024 * 1024))
+        if uploaded.size is not None and uploaded.size > max_bytes:
+            messages.error(
+                request,
+                f'Файл слишком большой (максимум {max_bytes // (1024 * 1024)} МБ).',
+            )
+            return redirect('plans:upload_plx')
 
         _clear_pending_upload(request)
         suffix = Path(uploaded.name).suffix or '.plx'

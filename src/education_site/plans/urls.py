@@ -1,11 +1,22 @@
 from django.urls import path
 
-from . import document_views, upload_views, views
+from . import document_views, home_views, upload_views, views
+from . import export_views, views_registry
 
 app_name = 'plans'
 
 urlpatterns = [
-    path('', views.plan_list, name='plan_list'),
+    path('', home_views.home, name='home'),
+    path('plans/', views_registry.plan_list, name='plan_list'),
+    path('plans/trash/', views_registry.trash_list, name='trash_list'),
+    path(
+        'plans/trash/<uuid:document_id>/hard-delete/',
+        views_registry.hard_delete_document,
+        name='hard_delete_document',
+    ),
+    path('plans/bulk/', views_registry.bulk_registry_action, name='bulk_registry'),
+    path('plans/export.csv', export_views.export_csv, name='export_csv'),
+    path('plans/export.xlsx', export_views.export_xlsx, name='export_xlsx'),
     path('add/', views.plan_add, name='plan_add'),
     path('upload/', upload_views.upload_plx, name='upload_plx'),
     path('sync-yandex/', views.sync_yandex, name='sync_yandex'),

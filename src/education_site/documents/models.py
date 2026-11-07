@@ -17,7 +17,7 @@ class VersionStatus(models.TextChoices):
     NEEDS_FIX = 'needs_fix', 'Требует доработки'
     APPROVED = 'approved', 'Утверждён'
     ARCHIVED = 'archived', 'В архиве'
-    INVALID = 'invalid', 'Невалидный'
+    INVALID = 'invalid', 'Некорректный'
     TRASHED = 'trashed', 'В корзине'
 
 
@@ -65,12 +65,12 @@ class Document(TimestampedModel):
 class DocumentAlias(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='aliases')
-    alias = models.CharField(max_length=255, db_index=True, unique=True, verbose_name='Алиас')
-    alias_source = models.CharField(max_length=64, blank=True, default='', verbose_name='Источник алиаса')
+    alias = models.CharField(max_length=255, db_index=True, unique=True, verbose_name='Синоним')
+    alias_source = models.CharField(max_length=64, blank=True, default='', verbose_name='Источник синонима')
 
     class Meta:
-        verbose_name = 'Алиас документа'
-        verbose_name_plural = 'Алиасы документов'
+        verbose_name = 'Синоним'
+        verbose_name_plural = 'Синонимы'
 
     def __str__(self) -> str:
         return self.alias
@@ -92,7 +92,7 @@ class DocumentVersion(TimestampedModel):
     content_hash = models.CharField(max_length=128, db_index=True, verbose_name='Хэш содержимого')
     created_by_user_id = models.IntegerField(null=True, blank=True, verbose_name='Автор')
     change_comment = models.TextField(blank=True, default='', verbose_name='Комментарий к версии')
-    extracted_metadata = models.JSONField(default=dict, blank=True, verbose_name='Метаданные')
+    extracted_metadata = models.JSONField(default=dict, blank=True, verbose_name='Реквизиты')
     error_messages = models.JSONField(default=list, blank=True, verbose_name='Ошибки')
 
     class Meta:

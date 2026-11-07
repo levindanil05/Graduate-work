@@ -73,7 +73,7 @@ msgid "Archive"
 msgstr "В архив"
 
 msgid "Mark invalid"
-msgstr "Пометить невалидным"
+msgstr "Пометить некорректным"
 
 msgid "Move to trash"
 msgstr "В корзину"
@@ -106,7 +106,7 @@ msgstr "Выберите файл .plx"
 
 # plans/templates/plans/upload_plx.html
 msgid "Upload study plan"
-msgstr "Загрузка учебного плана"
+msgstr "Загрузить учебный план"
 
 msgid "← Back to list"
 msgstr "← К списку"
@@ -121,7 +121,13 @@ msgid "Canonical name from file:"
 msgstr "Каноническое имя из файла:"
 
 msgid "Aliases:"
-msgstr "Алиасы:"
+msgstr "Другие допустимые имена:"
+
+msgid "Other acceptable names:"
+msgstr "Другие допустимые имена:"
+
+msgid "Hard delete is not allowed for the current user"
+msgstr "Физическое удаление недоступно для текущего пользователя"
 
 msgid "Attach to this plan"
 msgstr "Привязать к этому плану"
@@ -252,7 +258,7 @@ msgid "Automatic name from metadata:"
 msgstr "Автоматическое имя из метаданных:"
 
 msgid "Edit name via metadata fields"
-msgstr "Изменить имя через поля метаданных"
+msgstr "Изменить имя через реквизиты"
 
 msgid "Change the fields below — the file name is rebuilt from them. Direct free-form renaming is not used, so the name stays close to the canonical pattern."
 msgstr "Измените поля ниже — имя файла будет собрано из них. Свободное переименование не используется, поэтому имя остаётся близким к каноническому шаблону."

@@ -91,18 +91,38 @@ class ReconciliationService:
         pull_only: bool = False,
         push_only: bool = False,
         sync_run: SyncRun | None = None,
+        from_schedule: bool = False,
     ) -> SyncRun:
+        queued = sync_run is not None and sync_run.status == SyncRunStatus.QUEUED
+
         if sync_run is None:
             sync_run = SyncRun.objects.create(
                 connection=self.connection,
                 status=SyncRunStatus.PLANNING,
                 idempotency_key=uuid.uuid4().hex,
             )
+        elif queued:
+            sync_run.status = SyncRunStatus.PLANNING
+            sync_run.save(update_fields=['status', 'updated_at'])
         else:
             sync_run.status = SyncRunStatus.PLANNING
             sync_run.save(update_fields=['status', 'updated_at'])
 
-        if not self.connection.manual_run_enabled and not self.connection.schedule_enabled:
+        if queued:
+            if not self.connection.manual_run_enabled:
+                sync_run.status = SyncRunStatus.PAUSED
+                sync_run.stop_reason = 'Ручной запуск запрещён настройкой подключения'
+                sync_run.finished_at = timezone.now()
+                sync_run.save()
+                return sync_run
+        elif from_schedule:
+            if not self.connection.schedule_enabled:
+                sync_run.status = SyncRunStatus.PAUSED
+                sync_run.stop_reason = 'Расписание выключено для подключения'
+                sync_run.finished_at = timezone.now()
+                sync_run.save()
+                return sync_run
+        elif not self.connection.manual_run_enabled and not self.connection.schedule_enabled:
             sync_run.status = SyncRunStatus.PAUSED
             sync_run.stop_reason = 'Ручной запуск запрещён настройкой подключения'
             sync_run.finished_at = timezone.now()

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Обращение{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title=report.subject subtitle=report.get_kind_display %}
+
+<div class="card">
+    <p><strong>Автор:</strong> {{ report.author.username }} · {{ report.created_at|date:"d.m.Y H:i" }}</p>
+    <p class="pre-wrap">{{ report.body }}</p>
+    {% if report.document %}
+    <p><a href="{% url 'plans:document_detail' report.document_id %}">Открыть документ</a></p>
+    {% endif %}
+</div>
+
+{% if context_pretty %}
+<details class="card">
+    <summary>Технический контекст</summary>
+    <dl class="meta-dl">
+        {% for key, val in context_pretty.items %}
+        <dt>{{ key }}</dt><dd>{{ val }}</dd>
+        {% endfor %}
+    </dl>
+</details>
+{% endif %}
+
+<form method="post" class="form-stack card">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Сохранить ответ</button>
+    <a class="btn btn-ghost" href="{% url 'feedback:staff_list' %}">К списку</a>
+</form>
+{% endblock %}

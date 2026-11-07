@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 
+from defusedxml import ElementTree as ET
 from django.core.files.uploadedfile import UploadedFile
 
 # plx_parser.py
