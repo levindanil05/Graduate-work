@@ -34,6 +34,18 @@ from .workflow_rules import get_rule
 SYNC_ACTOR_USER_ID = 0
 
 
+NAME_POLICY_KEEP_PLAN = 'keep_plan'
+NAME_POLICY_USE_UPLOAD = 'use_upload'
+NAME_POLICY_FROM_METADATA = 'from_metadata'
+NAME_POLICIES = frozenset(
+    {
+        NAME_POLICY_KEEP_PLAN,
+        NAME_POLICY_USE_UPLOAD,
+        NAME_POLICY_FROM_METADATA,
+    }
+)
+
+
 @dataclass
 class UploadRequest:
     user_id: int
@@ -46,6 +58,8 @@ class UploadRequest:
     skip_filename_check: bool = False
     # Добавить исходное/каноническое имя в алиасы после успешной загрузки версии.
     link_source_as_alias: bool = False
+    # При привязке к существующему плану: keep_plan | use_upload | from_metadata.
+    name_policy: str = NAME_POLICY_KEEP_PLAN
 
 
 @dataclass
@@ -277,11 +291,23 @@ class DocumentApplicationService:
         document.updated_at = datetime.now()
         self.documents.save(document)
 
+        upload_name = request.source_filename
         if request.link_source_as_alias or request.skip_filename_check:
             canon_meta = ''
             if isinstance(metadata.get('canonical_filename'), str):
                 canon_meta = metadata['canonical_filename']
-            self._merge_identity_aliases(document, request.source_filename, canon_meta)
+            self._merge_identity_aliases(document, upload_name, canon_meta)
+
+        self._apply_attach_name_policy(
+            document=document,
+            version=saved_version,
+            upload_name=upload_name,
+            metadata=metadata,
+            name_policy=request.name_policy,
+        )
+        # Reload after possible rename/policy updates.
+        document = self.documents.get(document.id) or document
+        saved_version = self.versions.get_active_version(document.id) or saved_version
 
         if saved_version.status == VersionStatus.INVALID:
             first_error = saved_version.error_messages[0] if saved_version.error_messages else ""
@@ -397,23 +423,14 @@ class DocumentApplicationService:
         old_source = version.source_filename
         old_canonical = document.identity.canonical_name
         new_meta = apply_naming_values(meta, field_values)
-        new_key = version.storage_key
-
-        if rename_file and hasattr(self.storage, 'rename'):
-            try:
-                new_key = self.storage.rename(version.storage_key, proposed)
-            except FileExistsError as exc:
-                raise DomainValidationError(
-                    _('A file named «%(name)s» already exists in storage') % {'name': proposed}
-                ) from exc
-            except FileNotFoundError as exc:
-                raise DomainValidationError(_('Source file was not found in storage')) from exc
 
         version.extracted_metadata = new_meta
         version.source_filename = proposed
-        version.storage_key = new_key
         version.updated_at = datetime.now()
         self.versions.save(version)
+
+        if rename_file:
+            self._rename_version_storage_to_basename(document.id, version, proposed)
 
         document.identity = DocumentIdentity(
             canonical_name=proposed,
@@ -424,6 +441,117 @@ class DocumentApplicationService:
         self._merge_identity_aliases(document, old_source, old_canonical, proposed)
 
         return proposed
+
+    def _reclaim_sibling_storage_basename(
+        self,
+        document_id: UUID,
+        current_version: DocumentVersion,
+        proposed_basename: str,
+    ) -> None:
+        """If another version of the same plan owns the target basename, move it back to UUID key."""
+        from .infra.storage import UserfilesStoragePort
+
+        proposed_name = Path(proposed_basename).name
+        if not proposed_name or not hasattr(self.storage, 'rename'):
+            return
+        target_key = str(Path(current_version.storage_key).with_name(proposed_name)).replace('\\', '/')
+        current_key = (current_version.storage_key or '').replace('\\', '/')
+        if target_key == current_key:
+            return
+
+        for sibling in self.versions.list_for_document(document_id):
+            if sibling.id == current_version.id:
+                continue
+            sibling_key = (sibling.storage_key or '').replace('\\', '/')
+            if sibling_key != target_key:
+                continue
+            stable_key = UserfilesStoragePort.version_storage_key(document_id, sibling.id)
+            stable_basename = Path(stable_key).name
+            try:
+                new_sibling_key = self.storage.rename(sibling.storage_key, stable_basename)
+            except FileExistsError:
+                # UUID path already present — drop the conflicting human-named file and point DB to UUID key.
+                if hasattr(self.storage, 'delete'):
+                    self.storage.delete(sibling.storage_key)
+                new_sibling_key = stable_key
+            except FileNotFoundError:
+                new_sibling_key = stable_key
+            sibling.storage_key = new_sibling_key
+            sibling.updated_at = datetime.now()
+            self.versions.save(sibling)
+            break
+
+    def _rename_version_storage_to_basename(
+        self,
+        document_id: UUID,
+        version: DocumentVersion,
+        proposed: str,
+    ) -> DocumentVersion:
+        """Rename version file on disk; reclaim basename from sibling versions of the same plan."""
+        if not hasattr(self.storage, 'rename'):
+            return version
+        proposed_name = Path(proposed).name
+        if not proposed_name:
+            return version
+        self._reclaim_sibling_storage_basename(document_id, version, proposed_name)
+        try:
+            new_key = self.storage.rename(version.storage_key, proposed_name)
+        except FileExistsError as exc:
+            raise DomainValidationError(
+                _('A file named «%(name)s» already exists in storage') % {'name': proposed_name}
+            ) from exc
+        except FileNotFoundError as exc:
+            raise DomainValidationError(_('Source file was not found in storage')) from exc
+        version.storage_key = new_key
+        version.updated_at = datetime.now()
+        return self.versions.save(version)
+
+    def _apply_attach_name_policy(
+        self,
+        *,
+        document: Document,
+        version: DocumentVersion,
+        upload_name: str,
+        metadata: dict[str, object],
+        name_policy: str,
+    ) -> None:
+        """Apply naming choice after attaching a new version to an existing plan."""
+        from plans.canonical_edit import expected_canonical_from_meta, normalize_filename
+
+        policy = name_policy if name_policy in NAME_POLICIES else NAME_POLICY_KEEP_PLAN
+        plan_name = (document.identity.canonical_name or '').strip()
+        meta = dict(metadata or {})
+
+        if policy == NAME_POLICY_USE_UPLOAD:
+            return
+
+        if policy == NAME_POLICY_FROM_METADATA:
+            proposed = expected_canonical_from_meta(meta).strip()
+            if not proposed:
+                return
+            old_plan = plan_name
+            version.source_filename = proposed
+            version.updated_at = datetime.now()
+            self.versions.save(version)
+            document.identity = DocumentIdentity(
+                canonical_name=proposed,
+                aliases=document.identity.aliases,
+            )
+            document.updated_at = datetime.now()
+            self.documents.save(document)
+            self._merge_identity_aliases(document, upload_name, old_plan, proposed)
+            self._rename_version_storage_to_basename(document.id, version, proposed)
+            return
+
+        # keep_plan (default): logical name of the new version = existing plan name.
+        if not plan_name:
+            return
+        if normalize_filename(version.source_filename) != normalize_filename(plan_name):
+            version.source_filename = plan_name
+            version.updated_at = datetime.now()
+            self.versions.save(version)
+        self._merge_identity_aliases(document, upload_name)
+        self._rename_version_storage_to_basename(document.id, version, plan_name)
 
     def transition_version_status(
         self,

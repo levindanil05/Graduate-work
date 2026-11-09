@@ -5,7 +5,12 @@ from uuid import UUID
 
 from documents.entities import DocumentType
 from documents.factory import build_document_service
-from documents.services import UploadRequest, UploadResult
+from documents.services import (
+    NAME_POLICIES,
+    NAME_POLICY_KEEP_PLAN,
+    UploadRequest,
+    UploadResult,
+)
 
 
 def ingest_plx_file(
@@ -18,9 +23,11 @@ def ingest_plx_file(
     auto_link_single_match: bool = True,
     skip_filename_check: bool = False,
     link_source_as_alias: bool = False,
+    name_policy: str = NAME_POLICY_KEEP_PLAN,
 ) -> UploadResult:
     """Upload PLX through domain service: matching, hash-dedup, parse → invalid."""
     service = build_document_service()
+    policy = name_policy if name_policy in NAME_POLICIES else NAME_POLICY_KEEP_PLAN
     request = UploadRequest(
         user_id=user_id,
         document_type=DocumentType.PLX,
@@ -28,6 +35,7 @@ def ingest_plx_file(
         source_filename=storage_key.replace('\\', '/'),
         skip_filename_check=skip_filename_check,
         link_source_as_alias=link_source_as_alias or skip_filename_check,
+        name_policy=policy,
     )
 
     if document_id is not None:
@@ -45,6 +53,7 @@ def ingest_plx_file(
                 change_comment=request.change_comment,
                 skip_filename_check=exact[0].reason == 'canonical_exact',
                 link_source_as_alias=True,
+                name_policy=policy,
             )
             return service.upload_new_version(exact[0].document_id, link_request)
 

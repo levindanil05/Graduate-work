@@ -21,7 +21,7 @@
 {% endif %}
 
 {% for item in suggestions %}
-<form method="post" class="card upload-match {% if item.reason != 'metadata_approx' %}upload-match-exact{% endif %}">
+<form method="post" class="card upload-match {% if item.reason != 'metadata_approx' %}upload-match-exact{% endif %} form-stack">
     {% csrf_token %}
     <input type="hidden" name="confirm_document_id" value="{{ item.document_id }}">
     <strong>{{ item.canonical_name }}</strong>
@@ -41,6 +41,7 @@
     {% if item.aliases %}
     <p class="hint-text">{% trans "Aliases:" %} {{ item.aliases|join:", " }}</p>
     {% endif %}
+    {% include "plans/_name_policy_fields.html" with plan_name=item.canonical_name upload_name=pending_name meta_name=pending_canonical name_policy="keep_plan" %}
     <button type="submit" class="btn btn-primary">{% trans "Attach to this plan" %}</button>
 </form>
 {% endfor %}
@@ -80,6 +81,9 @@
         </span>
         <span class="file-drop-hint">{% trans "Or drop a .plx file here" %}</span>
     </div>
+    {% if show_name_policy %}
+        {% include "plans/_name_policy_fields.html" %}
+    {% endif %}
     {% if not preset_document %}
     <p>
         <label>

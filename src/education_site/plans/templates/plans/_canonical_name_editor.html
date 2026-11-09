@@ -6,6 +6,12 @@
     <p class="meta">
         {% trans "File:" %} <code>{{ canonicity.current_filename }}</code>
     </p>
+    {% if canonicity.plan_vs_auto_differs %}
+    <p class="canon-bad">
+        {% trans "Current requisites yield a different automatic name than the plan name:" %}
+        <code>{{ canonicity.auto_canonical }}</code>
+    </p>
+    {% endif %}
     {% else %}
     <p class="canon-bad">
         {% trans "Name does not match the canonical pattern." %}

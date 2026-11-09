@@ -14,9 +14,17 @@ from django.views.decorators.http import require_http_methods
 from documents.entities import DocumentType
 from documents.factory import build_document_service
 from documents.models import Document
-from documents.services import UploadRequest
+from documents.services import (
+    NAME_POLICIES,
+    NAME_POLICY_KEEP_PLAN,
+    UploadRequest,
+)
 from documents.upload import ingest_plx_file
-from plans.canonical_edit import check_canonicity
+from plans.canonical_edit import (
+    auto_canonical_from_meta,
+    check_canonicity,
+    normalize_filename,
+)
 
 SESSION_UPLOAD_PATH = 'pending_plx_upload_path'
 SESSION_UPLOAD_NAME = 'pending_plx_upload_name'
@@ -29,6 +37,11 @@ def _clear_pending_upload(request) -> None:
     request.session.pop(SESSION_UPLOAD_CANON, None)
     if pending and Path(pending).exists():
         Path(pending).unlink()
+
+
+def _parse_name_policy(request) -> str:
+    raw = (request.POST.get('name_policy') or NAME_POLICY_KEEP_PLAN).strip()
+    return raw if raw in NAME_POLICIES else NAME_POLICY_KEEP_PLAN
 
 
 def _document_needs_name_fix(document_id: UUID) -> bool:
@@ -47,10 +60,46 @@ def _document_needs_name_fix(document_id: UUID) -> bool:
     return not status.is_canonical
 
 
-def _redirect_after_upload(request, document_id: UUID | None):
+def _plan_vs_auto_differs(document_id: UUID) -> tuple[bool, str, str]:
+    document = (
+        Document.objects.select_related('current_version')
+        .filter(pk=document_id)
+        .first()
+    )
+    if document is None or document.current_version is None:
+        return False, '', ''
+    plan_name = document.canonical_name or ''
+    auto_name = auto_canonical_from_meta(document.current_version.extracted_metadata or {})
+    differs = bool(
+        normalize_filename(plan_name)
+        and normalize_filename(auto_name)
+        and normalize_filename(plan_name) != normalize_filename(auto_name)
+    )
+    return differs, plan_name, auto_name
+
+
+def _redirect_after_upload(
+    request,
+    document_id: UUID | None,
+    *,
+    attached_to_existing: bool = False,
+):
     if not document_id:
         return redirect('plans:plan_list')
     url = reverse('plans:document_detail', kwargs={'document_id': document_id})
+    if attached_to_existing:
+        differs, plan_name, auto_name = _plan_vs_auto_differs(document_id)
+        if differs:
+            messages.warning(
+                request,
+                _(
+                    'New version metadata yields a different name («%(auto)s») '
+                    'than the plan name («%(plan)s»). You can update the name '
+                    'via requisites on the plan card if needed.'
+                )
+                % {'auto': auto_name, 'plan': plan_name},
+            )
+        return redirect(url)
     if _document_needs_name_fix(document_id):
         messages.warning(
             request,
@@ -63,12 +112,38 @@ def _redirect_after_upload(request, document_id: UUID | None):
     return redirect(url)
 
 
+def _name_policy_context(
+    *,
+    plan_name: str = '',
+    upload_name: str = '',
+    meta_name: str = '',
+    name_policy: str = NAME_POLICY_KEEP_PLAN,
+) -> dict:
+    plan = (plan_name or '').strip()
+    upload = Path(upload_name or '').name
+    meta = (meta_name or '').strip()
+    return {
+        'plan_name': plan,
+        'upload_name': upload,
+        'meta_name': meta,
+        'meta_differs': bool(
+            plan
+            and meta
+            and normalize_filename(plan) != normalize_filename(meta)
+        ),
+        'name_policy': name_policy if name_policy in NAME_POLICIES else NAME_POLICY_KEEP_PLAN,
+        'show_name_policy': True,
+    }
+
+
 @upload_required
 @require_http_methods(['GET', 'POST'])
 def upload_plx(request):
     """Загрузка PLX: matching по имени/канону/метаданным, hash-dedup, parse → invalid."""
     service = build_document_service()
-    preset_document_id = request.GET.get('document_id', '').strip() or request.POST.get('document_id', '').strip()
+    preset_document_id = request.GET.get('document_id', '').strip() or request.POST.get(
+        'document_id', ''
+    ).strip()
     preset_document = None
     if preset_document_id:
         preset_document = get_object_or_404(Document, pk=preset_document_id)
@@ -79,6 +154,7 @@ def upload_plx(request):
         force_new_from_pending = request.POST.get('force_new_from_pending') == '1'
         pending_path = request.session.get(SESSION_UPLOAD_PATH)
         pending_name = request.session.get(SESSION_UPLOAD_NAME)
+        name_policy = _parse_name_policy(request)
         target_document_id = UUID(confirm_id) if confirm_id else None
 
         if preset_document_id and not confirm_id and request.FILES.get('plx_file'):
@@ -93,10 +169,14 @@ def upload_plx(request):
                     user_id=request.user.id,
                     force_new=True,
                 )
-                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
-                    'message': result.message,
-                    'status': result.status,
-                })
+                messages.success(
+                    request,
+                    _('Uploaded: %(message)s (%(status)s)')
+                    % {
+                        'message': result.message,
+                        'status': result.status,
+                    },
+                )
             except Exception as exc:  # noqa: BLE001
                 messages.error(request, _('Upload error: %(error)s') % {'error': exc})
             finally:
@@ -112,16 +192,25 @@ def upload_plx(request):
                     document_id=UUID(confirm_id),
                     skip_filename_check=True,
                     link_source_as_alias=True,
+                    name_policy=name_policy,
                 )
-                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
-                    'message': result.message,
-                    'status': result.status,
-                })
+                messages.success(
+                    request,
+                    _('Uploaded: %(message)s (%(status)s)')
+                    % {
+                        'message': result.message,
+                        'status': result.status,
+                    },
+                )
             except Exception as exc:  # noqa: BLE001
                 messages.error(request, _('Upload error: %(error)s') % {'error': exc})
             finally:
                 _clear_pending_upload(request)
-            return _redirect_after_upload(request, UUID(confirm_id))
+            return _redirect_after_upload(
+                request,
+                UUID(confirm_id),
+                attached_to_existing=True,
+            )
 
         uploaded = request.FILES.get('plx_file')
         if not uploaded:
@@ -159,13 +248,22 @@ def upload_plx(request):
                     document_id=target_document_id,
                     skip_filename_check=True,
                     link_source_as_alias=True,
+                    name_policy=name_policy,
                 )
-                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
-                    'message': result.message,
-                    'status': result.status,
-                })
+                messages.success(
+                    request,
+                    _('Uploaded: %(message)s (%(status)s)')
+                    % {
+                        'message': result.message,
+                        'status': result.status,
+                    },
+                )
                 tmp_path.unlink(missing_ok=True)
-                return _redirect_after_upload(request, target_document_id)
+                return _redirect_after_upload(
+                    request,
+                    target_document_id,
+                    attached_to_existing=True,
+                )
 
             if force_new:
                 result = ingest_plx_file(
@@ -174,10 +272,14 @@ def upload_plx(request):
                     user_id=request.user.id,
                     force_new=True,
                 )
-                messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
-                    'message': result.message,
-                    'status': result.status,
-                })
+                messages.success(
+                    request,
+                    _('Uploaded: %(message)s (%(status)s)')
+                    % {
+                        'message': result.message,
+                        'status': result.status,
+                    },
+                )
                 tmp_path.unlink(missing_ok=True)
                 return _redirect_after_upload(request, result.document_id)
 
@@ -203,6 +305,10 @@ def upload_plx(request):
                         'pending_name': storage_key,
                         'pending_canonical': incoming_canon,
                         'preset_document': preset_document,
+                        **_name_policy_context(
+                            upload_name=storage_key,
+                            meta_name=incoming_canon,
+                        ),
                     },
                 )
 
@@ -212,10 +318,14 @@ def upload_plx(request):
                 user_id=request.user.id,
                 force_new=True,
             )
-            messages.success(request, _('Uploaded: %(message)s (%(status)s)') % {
-                'message': result.message,
-                'status': result.status,
-            })
+            messages.success(
+                request,
+                _('Uploaded: %(message)s (%(status)s)')
+                % {
+                    'message': result.message,
+                    'status': result.status,
+                },
+            )
             tmp_path.unlink(missing_ok=True)
             return _redirect_after_upload(request, result.document_id)
         except Exception as exc:  # noqa: BLE001
@@ -231,13 +341,17 @@ def upload_plx(request):
             return redirect('plans:document_detail', document_id=preset_document_id)
         return redirect('plans:upload_plx')
 
-    return render(
-        request,
-        'plans/upload_plx.html',
-        {
-            'suggestions': [],
-            'pending_name': '',
-            'pending_canonical': '',
-            'preset_document': preset_document,
-        },
-    )
+    ctx = {
+        'suggestions': [],
+        'pending_name': '',
+        'pending_canonical': '',
+        'preset_document': preset_document,
+        'show_name_policy': False,
+    }
+    if preset_document is not None:
+        ctx.update(
+            _name_policy_context(
+                plan_name=preset_document.canonical_name,
+            )
+        )
+    return render(request, 'plans/upload_plx.html', ctx)

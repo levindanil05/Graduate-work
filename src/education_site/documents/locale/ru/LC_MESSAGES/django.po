@@ -241,9 +241,49 @@ msgstr "Сообщение добавлено"
 msgid "Uploaded file name does not match the canonical pattern. Please review and apply the suggested name."
 msgstr "Имя загруженного файла не соответствует каноническому. Проверьте поля и примените предложенное имя."
 
+msgid "New version metadata yields a different name («%(auto)s») than the plan name («%(plan)s»). You can update the name via requisites on the plan card if needed."
+msgstr "Реквизиты новой версии дают другое имя («%(auto)s»), чем имя плана («%(plan)s»). При необходимости обновите имя через реквизиты на карточке плана."
+
+# plans/templates/plans/_name_policy_fields.html
+msgid "File name for this version"
+msgstr "Имя файла для этой версии"
+
+msgid "By default the existing plan name is kept. You can take the uploaded file name or rebuild the name from the new version metadata."
+msgstr "По умолчанию сохраняется имя плана. Можно взять имя загруженного файла или собрать имя заново по реквизитам новой версии."
+
+msgid "Plan name:"
+msgstr "Имя плана:"
+
+msgid "Uploaded file:"
+msgstr "Загруженный файл:"
+
+msgid "New version metadata yields a different name:"
+msgstr "Реквизиты новой версии дают другое имя:"
+
+msgid "Name from file requisites:"
+msgstr "Имя по реквизитам файла:"
+
+msgid "Keep plan name «%(name)s»"
+msgstr "Оставить имя плана «%(name)s»"
+
+msgid "Keep plan name"
+msgstr "Оставить имя плана"
+
+msgid "Use uploaded file name «%(name)s»"
+msgstr "Взять имя загруженного файла «%(name)s»"
+
+msgid "Use uploaded file name"
+msgstr "Взять имя загруженного файла"
+
+msgid "Update name from new version metadata «%(name)s»"
+msgstr "Обновить имя по реквизитам новой версии «%(name)s»"
+
 # plans/templates/plans/_canonical_name_editor.html
 msgid "File name and canonicity"
 msgstr "Имя файла и каноничность"
+
+msgid "Current requisites yield a different automatic name than the plan name:"
+msgstr "Текущие реквизиты дают другое автоматическое имя, чем имя плана:"
 
 msgid "Current name matches the canonical pattern."
 msgstr "Текущее имя соответствует каноническому шаблону."

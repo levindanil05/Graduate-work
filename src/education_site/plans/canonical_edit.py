@@ -75,6 +75,8 @@ class CanonicityStatus:
     auto_canonical: str
     source_differs: bool
     document_differs: bool
+    # Имя плана сознательно сохранено, но реквизиты текущей версии дают другое автоимя.
+    plan_vs_auto_differs: bool = False
 
 
 def normalize_filename(name: str) -> str:
@@ -106,8 +108,10 @@ def check_canonicity(
     src_norm = normalize_filename(source_filename)
     doc_norm = normalize_filename(document_canonical_name)
     exp_norm = normalize_filename(expected)
+    auto_norm = normalize_filename(auto)
     source_differs = bool(src_norm and exp_norm and src_norm != exp_norm)
     document_differs = bool(doc_norm and exp_norm and doc_norm != exp_norm)
+    plan_vs_auto = bool(doc_norm and auto_norm and doc_norm != auto_norm)
     return CanonicityStatus(
         is_canonical=not source_differs and not document_differs,
         current_filename=Path(source_filename or '').name,
@@ -116,6 +120,7 @@ def check_canonicity(
         auto_canonical=auto,
         source_differs=source_differs,
         document_differs=document_differs,
+        plan_vs_auto_differs=plan_vs_auto,
     )
 
 

@@ -1,0 +1,50 @@
+{% load i18n %}
+{# Выбор имени при привязке версии к существующему плану. #}
+<fieldset class="name-policy">
+    <legend>{% trans "File name for this version" %}</legend>
+    <p class="hint-text">
+        {% trans "By default the existing plan name is kept. You can take the uploaded file name or rebuild the name from the new version metadata." %}
+    </p>
+    {% if plan_name %}
+    <p class="meta">{% trans "Plan name:" %} <code>{{ plan_name }}</code></p>
+    {% endif %}
+    {% if upload_name %}
+    <p class="meta">{% trans "Uploaded file:" %} <code>{{ upload_name }}</code></p>
+    {% endif %}
+    {% if meta_name and plan_name and meta_name != plan_name %}
+    <p class="canon-bad">
+        {% trans "New version metadata yields a different name:" %}
+        <code>{{ meta_name }}</code>
+    </p>
+    {% elif meta_name %}
+    <p class="meta">{% trans "Name from file requisites:" %} <code>{{ meta_name }}</code></p>
+    {% endif %}
+    <p>
+        <label>
+            <input type="radio" name="name_policy" value="keep_plan" {% if not name_policy or name_policy == 'keep_plan' %}checked{% endif %}>
+            {% if plan_name %}
+                {% blocktrans with name=plan_name %}Keep plan name «{{ name }}»{% endblocktrans %}
+            {% else %}
+                {% trans "Keep plan name" %}
+            {% endif %}
+        </label>
+    </p>
+    <p>
+        <label>
+            <input type="radio" name="name_policy" value="use_upload" {% if name_policy == 'use_upload' %}checked{% endif %}>
+            {% if upload_name %}
+                {% blocktrans with name=upload_name %}Use uploaded file name «{{ name }}»{% endblocktrans %}
+            {% else %}
+                {% trans "Use uploaded file name" %}
+            {% endif %}
+        </label>
+    </p>
+    {% if meta_name %}
+    <p>
+        <label>
+            <input type="radio" name="name_policy" value="from_metadata" {% if name_policy == 'from_metadata' %}checked{% endif %}>
+            {% blocktrans with name=meta_name %}Update name from new version metadata «{{ name }}»{% endblocktrans %}
+        </label>
+    </p>
+    {% endif %}
+</fieldset>
