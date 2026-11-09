@@ -61,6 +61,7 @@ def plan_list(request: HttpRequest) -> HttpResponse:
             'page_size': page_size,
             'query_string': query_string,
             'can_upload': user_can_upload(request),
+            'hide_bulk_trash': request.GET.get('status') == DomainVersionStatus.TRASHED.value,
         },
     )
 
@@ -123,28 +124,85 @@ def hard_delete_document(request: HttpRequest, document_id) -> HttpResponse:
 def bulk_registry_action(request: HttpRequest) -> HttpResponse:
     action = request.POST.get('action', '')
     version_ids = request.POST.getlist('version_ids')
+    redirect_trash = action in {'restore', 'hard_delete'}
+    redirect_to = 'plans:trash_list' if redirect_trash else 'plans:plan_list'
+
     if not version_ids:
         messages.warning(request, 'Не выбрано ни одной версии.')
+        return redirect(redirect_to)
+
+    if action not in {'trash', 'restore', 'hard_delete'}:
+        messages.error(request, 'Неизвестное действие.')
         return redirect('plans:plan_list')
 
     service = build_document_service()
     perms = RolePermissionService()
     user_id = request.user.pk
     success = 0
+    skipped = 0
     errors = 0
+
+    if action == 'hard_delete':
+        if not user_can_hard_delete(user_id):
+            messages.error(request, 'Недостаточно прав для физического удаления.')
+            return redirect('plans:trash_list')
+
+        seen_documents: set = set()
+        for raw_id in version_ids:
+            version = (
+                DocumentVersion.objects.filter(pk=raw_id)
+                .select_related('document', 'document__current_version')
+                .first()
+            )
+            if version is None:
+                errors += 1
+                continue
+            document = version.document
+            if document is None:
+                errors += 1
+                continue
+            if document.pk in seen_documents:
+                continue
+            seen_documents.add(document.pk)
+            current = document.current_version
+            if current is None or current.status != DomainVersionStatus.TRASHED.value:
+                errors += 1
+                continue
+            try:
+                service.hard_delete_document(document_id=document.pk, actor_user_id=user_id)
+                success += 1
+            except DomainValidationError:
+                errors += 1
+            except Exception:
+                errors += 1
+
+        if success:
+            from documents.audit import log_action
+
+            log_action(
+                action='registry_bulk_hard_delete',
+                actor=request.user,
+                object_type='document',
+                metadata={'count': success, 'version_ids': version_ids},
+            )
+            messages.success(request, f'Безвозвратно удалено документов: {success}.')
+        if errors:
+            messages.warning(request, f'Не удалось удалить: {errors}.')
+        return redirect('plans:trash_list')
 
     for raw_id in version_ids:
         version = DocumentVersion.objects.filter(pk=raw_id).select_related('document').first()
         if version is None:
             errors += 1
             continue
+
         if action == 'trash':
+            if version.status == DomainVersionStatus.TRASHED.value:
+                skipped += 1
+                continue
             target = DomainVersionStatus.TRASHED
-        elif action == 'restore':
-            target = DomainVersionStatus.NEW
         else:
-            messages.error(request, 'Неизвестное действие.')
-            return redirect('plans:plan_list')
+            target = DomainVersionStatus.NEW
 
         if not perms.can_transition(user_id, version, target):
             errors += 1
@@ -171,9 +229,9 @@ def bulk_registry_action(request: HttpRequest) -> HttpResponse:
             metadata={'count': success, 'version_ids': version_ids},
         )
         messages.success(request, f'Обработано версий: {success}.')
+    if skipped:
+        messages.info(request, f'Уже были в корзине: {skipped}.')
     if errors:
         messages.warning(request, f'Не удалось обработать: {errors}.')
 
-    if action == 'restore':
-        return redirect('plans:trash_list')
-    return redirect('plans:plan_list')
+    return redirect(redirect_to)

@@ -24,6 +24,12 @@
   color: var(--color-primary);
 }
 
+.btn-danger {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
 .btn-sm {
   padding: 0.35rem 0.75rem;
   font-size: 0.9rem;
@@ -251,9 +257,15 @@ label.force-dev {
   max-width: 560px;
 }
 
-.name-policy legend {
+.name-policy > summary {
+  cursor: pointer;
   font-weight: 600;
-  padding: 0 var(--space-1);
+  color: var(--color-muted);
+}
+
+.name-policy[open] > summary {
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
 }
 
 .name-policy p {

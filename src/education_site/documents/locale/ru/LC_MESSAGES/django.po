@@ -245,6 +245,12 @@ msgid "New version metadata yields a different name («%(auto)s») than the plan
 msgstr "Реквизиты новой версии дают другое имя («%(auto)s»), чем имя плана («%(plan)s»). При необходимости обновите имя через реквизиты на карточке плана."
 
 # plans/templates/plans/_name_policy_fields.html
+msgid "Change file name (optional)"
+msgstr "Изменить имя файла (необязательно)"
+
+msgid "If you do not change anything, the existing plan name is kept."
+msgstr "Если ничего не менять, сохраняется имя плана."
+
 msgid "File name for this version"
 msgstr "Имя файла для этой версии"
 

@@ -1,9 +1,9 @@
 {% load i18n %}
-{# Выбор имени при привязке версии к существующему плану. #}
-<fieldset class="name-policy">
-    <legend>{% trans "File name for this version" %}</legend>
+{# Выбор имени при привязке — под спойлером; по умолчанию оставляем имя плана. #}
+<details class="name-policy">
+    <summary>{% trans "Change file name (optional)" %}</summary>
     <p class="hint-text">
-        {% trans "By default the existing plan name is kept. You can take the uploaded file name or rebuild the name from the new version metadata." %}
+        {% trans "If you do not change anything, the existing plan name is kept." %}
     </p>
     {% if plan_name %}
     <p class="meta">{% trans "Plan name:" %} <code>{{ plan_name }}</code></p>
@@ -12,7 +12,7 @@
     <p class="meta">{% trans "Uploaded file:" %} <code>{{ upload_name }}</code></p>
     {% endif %}
     {% if meta_name and plan_name and meta_name != plan_name %}
-    <p class="canon-bad">
+    <p class="meta">
         {% trans "New version metadata yields a different name:" %}
         <code>{{ meta_name }}</code>
     </p>
@@ -47,4 +47,4 @@
         </label>
     </p>
     {% endif %}
-</fieldset>
+</details>

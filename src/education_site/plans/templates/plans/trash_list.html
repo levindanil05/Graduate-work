@@ -16,13 +16,24 @@
 
 <p class="hint-line">Автоочистка через {{ trash_retention_days }} сут. после помещения в корзину; ниже — остаток до автоудаления.</p>
 
-<form id="trash-restore-form" method="post" action="{% url 'plans:bulk_registry' %}">
+<form id="trash-bulk-form" method="post" action="{% url 'plans:bulk_registry' %}">
     {% csrf_token %}
-    <input type="hidden" name="action" value="restore">
     <div class="toolbar-row">
-        <button type="submit" class="btn btn-primary">Восстановить выбранные</button>
+        <button type="submit" name="action" value="restore" class="btn btn-primary">Восстановить выбранные</button>
+        {% if can_hard_delete %}
+        <button
+            type="submit"
+            name="action"
+            value="hard_delete"
+            class="btn btn-danger"
+            onclick="return confirm('Удалить выбранные документы и файлы безвозвратно? Это действие нельзя отменить.');"
+        >Удалить выбранные безвозвратно</button>
+        {% endif %}
     </div>
 </form>
+{% if can_hard_delete %}
+<p class="hint-line">Безвозвратное удаление удаляет документ и все его файлы без возможности восстановления.</p>
+{% endif %}
     <table class="data-table">
         <thead>
             <tr>
@@ -38,7 +49,7 @@
             {% for row in rows %}
             {% with v=row.version %}
             <tr>
-                <td><input form="trash-restore-form" type="checkbox" name="version_ids" value="{{ v.pk }}"></td>
+                <td><input form="trash-bulk-form" type="checkbox" name="version_ids" value="{{ v.pk }}"></td>
                 <td>{{ v.source_filename }}</td>
                 <td>{{ v.document.canonical_name }}</td>
                 <td>{{ v.updated_at|date:"d.m.Y H:i" }}</td>

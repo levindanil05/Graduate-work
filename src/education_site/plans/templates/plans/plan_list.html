@@ -64,9 +64,11 @@
 
 <form method="post" action="{% url 'plans:bulk_registry' %}">
     {% csrf_token %}
+    {% if not hide_bulk_trash %}
     <div class="toolbar-row">
         <button type="submit" name="action" value="trash" class="btn btn-secondary">В корзину выбранные</button>
     </div>
+    {% endif %}
     <table class="data-table">
         <thead>
             <tr>
