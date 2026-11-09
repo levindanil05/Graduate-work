@@ -139,12 +139,41 @@
   margin-bottom: var(--space-1);
 }
 
-.form-stack input,
+.form-stack input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .form-stack select,
 .form-stack textarea {
   width: 100%;
   max-width: 480px;
   padding: 0.4rem;
+  box-sizing: border-box;
+}
+
+.form-stack input[type="file"] {
+  max-width: 480px;
+  padding: 0.2rem 0;
+}
+
+.form-stack input[type="checkbox"],
+.form-stack input[type="radio"],
+.canon-editor input[type="checkbox"],
+.canon-box input[type="checkbox"],
+label.force-dev input[type="checkbox"] {
+  width: auto;
+  max-width: none;
+  padding: 0;
+  margin: 0 0.4rem 0 0;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.form-stack label:has(> input[type="checkbox"]),
+.form-stack label:has(> input[type="radio"]),
+label.force-dev {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-weight: 400;
+  margin-bottom: 0;
 }
 
 .form-actions {
