@@ -65,12 +65,21 @@
     {% if preset_document %}
     <input type="hidden" name="document_id" value="{{ preset_document.id }}">
     {% endif %}
-    <p>
-        <label for="id_plx_file">
-            {% trans ".plx file" %}
-        </label>
-        <input id="id_plx_file" type="file" name="plx_file" accept=".plx" required>
-    </p>
+    <div class="file-drop" data-file-drop>
+        <input
+            id="id_plx_file"
+            class="file-drop-input"
+            type="file"
+            name="plx_file"
+            accept=".plx"
+            required
+        >
+        <span class="file-drop-btn">{% trans "Choose file" %}</span>
+        <span class="file-drop-name" data-file-drop-name data-empty="{% trans 'No file selected' %}">
+            {% trans "No file selected" %}
+        </span>
+        <span class="file-drop-hint">{% trans "Or drop a .plx file here" %}</span>
+    </div>
     {% if not preset_document %}
     <p>
         <label>
@@ -83,5 +92,32 @@
         <button type="submit" class="btn btn-primary">{% trans "Upload" %}</button>
     </div>
 </form>
+{% endif %}
+{% endblock %}
+
+{% block body_scripts %}
+{% if not suggestions %}
+<script>
+(function () {
+  var root = document.querySelector("[data-file-drop]");
+  if (!root) return;
+  var input = root.querySelector(".file-drop-input");
+  var nameEl = root.querySelector("[data-file-drop-name]");
+  if (!input || !nameEl) return;
+  var emptyText = nameEl.getAttribute("data-empty") || nameEl.textContent;
+  function syncName() {
+    var file = input.files && input.files[0];
+    if (file) {
+      nameEl.textContent = file.name;
+      nameEl.classList.remove("is-empty");
+    } else {
+      nameEl.textContent = emptyText;
+      nameEl.classList.add("is-empty");
+    }
+  }
+  nameEl.classList.add("is-empty");
+  input.addEventListener("change", syncName);
+})();
+</script>
 {% endif %}
 {% endblock %}

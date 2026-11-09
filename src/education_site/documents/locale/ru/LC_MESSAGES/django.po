@@ -147,6 +147,15 @@ msgstr "← К карточке"
 msgid ".plx file"
 msgstr "Файл .plx"
 
+msgid "Choose file"
+msgstr "Выбрать файл"
+
+msgid "No file selected"
+msgstr "Файл не выбран"
+
+msgid "Or drop a .plx file here"
+msgstr "или перетащите файл .plx сюда"
+
 msgid "Always create a new plan (skip matching)"
 msgstr "Всегда создавать новый план (без сопоставления)"
 
