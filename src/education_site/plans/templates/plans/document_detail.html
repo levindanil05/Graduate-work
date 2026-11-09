@@ -2,13 +2,13 @@
 {% load plans_extras %}
 {% load feedback_tags %}
 
-{% block title %}{{ document.canonical_name }}{% endblock %}
+{% block title %}{{ display_name }}{% endblock %}
 
 {% block content %}
-{% include "ui/page_title.html" with title=document.canonical_name breadcrumbs=True %}
+{% include "ui/page_title.html" with title=display_name %}
 <p class="breadcrumbs">
     <a href="{% url 'plans:plan_list' %}">Учебные планы</a>
-    · {{ document.canonical_name }}
+    · {{ display_name }}
 </p>
 
 <div class="meta">
@@ -19,6 +19,18 @@
     {% endif %}
 </div>
 
+<nav class="tabs" aria-label="Разделы документа">
+    <a href="?tab=status" class="{% if tab == 'status' %}active{% endif %}">Статус</a>
+    <a href="?tab=versions" class="{% if tab == 'versions' %}active{% endif %}">Версии</a>
+    <a href="?tab=workflow" class="{% if tab == 'workflow' %}active{% endif %}">Рабочий процесс</a>
+    <a href="?tab=discussion" class="{% if tab == 'discussion' %}active{% endif %}">Обсуждение</a>
+    <a href="?tab=metadata" class="{% if tab == 'metadata' %}active{% endif %}">Реквизиты плана</a>
+    {% if show_external_replicas %}
+    <a href="?tab=external" class="{% if tab == 'external' %}active{% endif %}">Резервные копии</a>
+    {% endif %}
+</nav>
+
+{% if tab == 'status' %}
 {% if process_diagram %}
 <section class="card process-card">
     <h2>Где сейчас документ</h2>
@@ -67,17 +79,7 @@
     {% endif %}
 </div>
 
-<nav class="tabs">
-    <a href="?tab=versions" class="{% if tab == 'versions' %}active{% endif %}">Версии</a>
-    <a href="?tab=workflow" class="{% if tab == 'workflow' %}active{% endif %}">Рабочий процесс</a>
-    <a href="?tab=discussion" class="{% if tab == 'discussion' %}active{% endif %}">Обсуждение</a>
-    <a href="?tab=metadata" class="{% if tab == 'metadata' %}active{% endif %}">Реквизиты плана</a>
-    {% if show_external_replicas %}
-    <a href="?tab=external" class="{% if tab == 'external' %}active{% endif %}">Резервные копии</a>
-    {% endif %}
-</nav>
-
-{% if tab == 'versions' %}
+{% elif tab == 'versions' %}
 <table class="data-table">
     <thead>
         <tr>
@@ -98,10 +100,11 @@
             <td><a href="{% url 'plans:download_version' document.id version.id %}">Скачать</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">{% include "ui/empty_state.html" with text="Версий пока нет. Загрузите файл — первая версия появится здесь." %}</td></tr>
+        <tr><td colspan="5">{% include "ui/empty_state.html" with message="Версий пока нет. Загрузите файл — первая версия появится здесь." %}</td></tr>
         {% endfor %}
     </tbody>
 </table>
+
 {% elif tab == 'workflow' %}
 <table class="data-table">
     <thead>
@@ -127,6 +130,7 @@
         {% endfor %}
     </tbody>
 </table>
+
 {% elif tab == 'discussion' %}
 {% if current_version %}
     {% for msg in discussion_messages %}
@@ -148,6 +152,7 @@
 {% else %}
     <p>Нет текущей версии для обсуждения.</p>
 {% endif %}
+
 {% elif tab == 'external' and show_external_replicas %}
 <h2>Резервные копии во внешнем хранилище</h2>
 {% if external_replica_rows %}
@@ -171,7 +176,14 @@
             <td>{{ row.state_label }}</td>
             <td>{{ row.replica.last_reconciled_at|date:"d.m.Y H:i"|default:"—" }}</td>
             <td>
-                <button type="button" class="btn btn-muted" onclick="navigator.clipboard.writeText(document.getElementById('path-{{ forloop.counter }}').innerText)">Копировать путь</button>
+                <button
+                    type="button"
+                    class="btn btn-muted js-copy-path"
+                    data-copy-target="path-{{ forloop.counter }}"
+                    data-label-default="Копировать путь"
+                    data-label-ok="Скопировано"
+                    data-label-err="Не удалось скопировать"
+                >Копировать путь</button>
                 {% if row.browse_url %}
                 · <a href="{{ row.browse_url }}" target="_blank" rel="noopener">Открыть во внешнем хранилище</a>
                 {% endif %}
@@ -185,6 +197,7 @@
 {% else %}
 <p>Резервных копий пока нет.</p>
 {% endif %}
+
 {% elif tab == 'metadata' %}
 {% if current_version %}
     {% if current_version.status == 'invalid' and current_version.error_messages %}
@@ -201,5 +214,42 @@
 {% else %}
     <p>Нет текущей версии.</p>
 {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block body_scripts %}
+{% if tab == 'external' and show_external_replicas and external_replica_rows %}
+<script>
+(function () {
+  document.querySelectorAll('.js-copy-path').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var targetId = btn.getAttribute('data-copy-target');
+      var el = targetId ? document.getElementById(targetId) : null;
+      var text = el ? (el.innerText || el.textContent || '').trim() : '';
+      var labelDefault = btn.getAttribute('data-label-default') || 'Копировать путь';
+      var labelOk = btn.getAttribute('data-label-ok') || 'Скопировано';
+      var labelErr = btn.getAttribute('data-label-err') || 'Не удалось скопировать';
+      function flash(label, ok) {
+        btn.textContent = label;
+        btn.classList.toggle('is-copy-ok', !!ok);
+        btn.classList.toggle('is-copy-err', !ok);
+        window.clearTimeout(btn._copyTimer);
+        btn._copyTimer = window.setTimeout(function () {
+          btn.textContent = labelDefault;
+          btn.classList.remove('is-copy-ok', 'is-copy-err');
+        }, 2000);
+      }
+      if (!text || !navigator.clipboard || !navigator.clipboard.writeText) {
+        flash(labelErr, false);
+        return;
+      }
+      navigator.clipboard.writeText(text).then(
+        function () { flash(labelOk, true); },
+        function () { flash(labelErr, false); }
+      );
+    });
+  });
+})();
+</script>
 {% endif %}
 {% endblock %}

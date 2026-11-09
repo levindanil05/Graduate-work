@@ -124,7 +124,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                 messages.success(request, _('Explanation saved'))
             except DomainValidationError as exc:
                 messages.error(request, str(exc))
-            return redirect('plans:document_detail', document_id=document.id)
+            return redirect(f'{request.path}?tab=status')
 
         if action == 'canonical_rename' and current and can_upload:
             naming_values = parse_naming_post(request.POST)
@@ -140,7 +140,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
                     request,
                     _('Name updated and file renamed to «%(name)s»') % {'name': new_name},
                 )
-                return redirect('plans:document_detail', document_id=document.id)
+                return redirect(f'{request.path}?tab=status')
             except DomainValidationError as exc:
                 messages.error(request, str(exc))
                 open_name_editor = True
@@ -175,12 +175,21 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         naming_form_fields = _naming_form_fields(naming_values)
         preview_canonical_name = build_preview_name(naming_values)
 
-    tab = request.GET.get('tab', 'versions')
+    tab = request.GET.get('tab', 'status')
     from accounts.permissions import user_can_see_external_replicas
 
     show_external = user_can_see_external_replicas(request.user.pk)
-    if tab == 'external' and not show_external:
-        tab = 'versions'
+    allowed_tabs = {
+        'status',
+        'versions',
+        'workflow',
+        'discussion',
+        'metadata',
+    }
+    if show_external:
+        allowed_tabs.add('external')
+    if tab not in allowed_tabs:
+        tab = 'status'
 
     replica_rows = []
     if show_external:
@@ -210,11 +219,18 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
 
     from helpcenter.views import process_diagram_context
 
+    display_name = (
+        current.source_filename
+        if current and current.source_filename
+        else document.canonical_name
+    )
+
     return render(
         request,
         'plans/document_detail.html',
         {
             'document': document,
+            'display_name': display_name,
             'current_version': current,
             'versions': document.versions.order_by('-version_number'),
             'workflow_history': _workflow_history(document),
@@ -231,7 +247,8 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'can_edit': can_edit,
             'can_upload': can_upload,
             'process_diagram': process_diagram_context(
-                current_status=current.status if current else None
+                current_status=current.status if current else None,
+                include_transitions=False,
             ),
         },
     )

@@ -19,8 +19,15 @@ MAIN_FLOW_STATUSES: tuple[VersionStatus, ...] = (
 )
 
 
-def process_diagram_context(*, current_status: str | VersionStatus | None = None) -> dict:
-    """Данные схемы процесса; current_status подсвечивает «Вы здесь»."""
+def process_diagram_context(
+    *,
+    current_status: str | VersionStatus | None = None,
+    include_transitions: bool = True,
+) -> dict:
+    """Данные схемы процесса; current_status подсвечивает «Вы здесь».
+
+    include_transitions=False — только этапы и подсказка (карточка документа).
+    """
     current = None
     if current_status is not None:
         current = (
@@ -63,20 +70,21 @@ def process_diagram_context(*, current_status: str | VersionStatus | None = None
         next_hint = 'Документ в корзине. Его можно восстановить или окончательно удалить (администратор).'
 
     transitions = []
-    for rule in TRANSITION_RULES:
-        from_label = (
-            'Любой (кроме корзины)'
-            if rule.from_status == ANY_STATUS
-            else target_status_label(rule.from_status)
-        )
-        transitions.append(
-            {
-                'from': from_label,
-                'to': target_status_label(rule.to_status),
-                'action': action_label(rule.action),
-                'requires_comment': rule.requires_comment,
-            }
-        )
+    if include_transitions:
+        for rule in TRANSITION_RULES:
+            from_label = (
+                'Любой (кроме корзины)'
+                if rule.from_status == ANY_STATUS
+                else target_status_label(rule.from_status)
+            )
+            transitions.append(
+                {
+                    'from': from_label,
+                    'to': target_status_label(rule.to_status),
+                    'action': action_label(rule.action),
+                    'requires_comment': rule.requires_comment,
+                }
+            )
     return {
         'stages': stages,
         'side_stages': side_stages,

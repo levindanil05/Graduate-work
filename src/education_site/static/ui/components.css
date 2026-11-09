@@ -346,6 +346,18 @@
   border: 1px solid var(--color-border);
 }
 
+.btn.is-copy-ok {
+  background: #e6f4ea;
+  border-color: #176b2c;
+  color: #176b2c;
+}
+
+.btn.is-copy-err {
+  background: #fce8e6;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .discussion-msg {
   border-left: 3px solid var(--color-border);
   padding: 0.5rem 0.75rem;
