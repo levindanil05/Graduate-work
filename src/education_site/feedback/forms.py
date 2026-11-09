@@ -14,7 +14,9 @@ class FeedbackCreateForm(forms.ModelForm):
             'body': _('Message'),
         }
         widgets = {
-            'body': forms.Textarea(attrs={'rows': 6}),
+            'kind': forms.Select(attrs={'id': 'id_kind'}),
+            'subject': forms.TextInput(attrs={'id': 'id_subject'}),
+            'body': forms.Textarea(attrs={'rows': 6, 'id': 'id_body'}),
         }
 
 
@@ -32,10 +34,13 @@ class FeedbackHandleForm(forms.ModelForm):
 
 
 class FeedbackCreateFormSimple(FeedbackCreateForm):
-    """Форма без перевода kind через gettext в choices — подписи в шаблоне."""
+    """Русские подписи полей и вариантов выбора для UI."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['kind'].label = 'Тип'
+        self.fields['subject'].label = 'Тема'
+        self.fields['body'].label = 'Текст обращения'
         self.fields['kind'].choices = [
             (FeedbackKind.PROBLEM, 'Сообщение о проблеме'),
             (FeedbackKind.QUESTION, 'Вопрос'),
@@ -46,6 +51,8 @@ class FeedbackCreateFormSimple(FeedbackCreateForm):
 class FeedbackHandleFormSimple(FeedbackHandleForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['status'].label = 'Статус'
+        self.fields['staff_reply'].label = 'Ответ'
         self.fields['status'].choices = [
             (FeedbackStatus.NEW, 'Новое'),
             (FeedbackStatus.IN_PROGRESS, 'В работе'),

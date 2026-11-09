@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% load feedback_tags %}
 
 {% block title %}Мои обращения{% endblock %}
 
 {% block content %}
 {% include "ui/page_title.html" with title="Мои обращения" %}
 <p class="toolbar-row">
-    <a class="btn btn-primary" href="{% url 'feedback:create' %}">Новое обращение</a>
+    <a class="btn btn-primary" href="{% feedback_create_url %}">Новое обращение</a>
 </p>
 {% if reports %}
 <table class="data-table">
@@ -22,14 +23,14 @@
         <tr>
             <td>{{ r.created_at|date:"d.m.Y H:i" }}</td>
             <td>{{ r.get_kind_display }}</td>
-            <td>{{ r.subject }}</td>
+            <td><a href="{% url 'feedback:my_detail' r.pk %}">{{ r.subject }}</a></td>
             <td>{{ r.get_status_display }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-{% url 'feedback:create' as feedback_create_url %}
-{% include "ui/empty_state.html" with message="Вы ещё не отправляли обращений." action_url=feedback_create_url action_label="Написать в поддержку" %}
+{% feedback_create_url as feedback_create_href %}
+{% include "ui/empty_state.html" with message="Вы ещё не отправляли обращений." action_url=feedback_create_href action_label="Написать в поддержку" %}
 {% endif %}
 {% endblock %}

@@ -1,3 +1,4 @@
+{% load feedback_tags %}
 <div class="account-menu">
     {% if user.is_authenticated %}
     <details class="account-dropdown">
@@ -8,7 +9,7 @@
         </summary>
         <div class="account-panel">
             <a href="{% url 'feedback:my_list' %}">Мои обращения</a>
-            <a href="{% url 'feedback:create' %}">Написать в поддержку</a>
+            <a href="{% feedback_create_url %}">Написать в поддержку</a>
             {% if nav_can_manage_feedback %}
             <a href="{% url 'feedback:staff_list' %}">Обращения пользователей</a>
             {% endif %}

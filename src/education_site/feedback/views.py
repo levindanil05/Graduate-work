@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from urllib.parse import unquote, urlparse
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import resolve, Resolver404
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -16,10 +19,50 @@ from .forms import FeedbackCreateFormSimple, FeedbackHandleFormSimple
 from .models import FeedbackReport
 
 
-def _build_context(request: HttpRequest) -> dict:
+def _normalize_source_path(raw: str | None) -> str:
+    """Оставить только внутренний path+query, без чужого хоста."""
+    if not raw:
+        return ''
+    value = unquote(raw.strip())
+    if value.startswith('http://') or value.startswith('https://'):
+        parsed = urlparse(value)
+        value = parsed.path or '/'
+        if parsed.query:
+            value = f'{value}?{parsed.query}'
+    if not value.startswith('/'):
+        return ''
+    # Не сохраняем саму форму обратной связи как «источник»
+    if value.startswith('/feedback/new'):
+        return ''
+    return value[:1000]
+
+
+def _route_name_for_path(path_with_query: str) -> str:
+    path = path_with_query.split('?', 1)[0] or '/'
+    try:
+        match = resolve(path)
+        return match.view_name or ''
+    except Resolver404:
+        return ''
+
+
+def _build_context(
+    request: HttpRequest,
+    *,
+    source_path: str = '',
+    document_id: str = '',
+) -> dict:
+    source_path = _normalize_source_path(source_path)
+    absolute_page = ''
+    if source_path:
+        absolute_page = request.build_absolute_uri(source_path)
+    else:
+        absolute_page = 'источник не указан'
+
     ctx: dict = {
-        'page_url': request.build_absolute_uri(),
-        'route_name': '',
+        'page_url': absolute_page,
+        'source_path': source_path or 'источник не указан',
+        'route_name': _route_name_for_path(source_path) if source_path else '',
         'document_id': '',
         'version_id': '',
         'document_status': '',
@@ -29,13 +72,7 @@ def _build_context(request: HttpRequest) -> dict:
         'app_version': settings.BRANDING.get('app_version', ''),
         'user_agent': request.META.get('HTTP_USER_AGENT', '')[:500],
     }
-    match = request.resolver_match
-    if match:
-        ctx['route_name'] = match.view_name or ''
-        for key in ('document_id', 'version_id'):
-            if key in match.kwargs:
-                ctx[key] = str(match.kwargs[key])
-    document_id = request.GET.get('document_id') or request.POST.get('document_id')
+
     if document_id:
         ctx['document_id'] = document_id
         doc = Document.objects.filter(pk=document_id).select_related('current_version').first()
@@ -51,7 +88,10 @@ def _build_context(request: HttpRequest) -> dict:
 @require_http_methods(['GET', 'POST'])
 def feedback_create(request: HttpRequest) -> HttpResponse:
     initial_document = None
-    document_id = request.GET.get('document_id') or request.POST.get('document_id')
+    document_id = (request.GET.get('document_id') or request.POST.get('document_id') or '').strip()
+    source_path = _normalize_source_path(
+        request.POST.get('source') or request.GET.get('source')
+    )
     if document_id:
         initial_document = Document.objects.filter(pk=document_id).first()
 
@@ -60,12 +100,16 @@ def feedback_create(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             report = form.save(commit=False)
             report.author = request.user
-            report.context = _build_context(request)
+            report.context = _build_context(
+                request,
+                source_path=source_path,
+                document_id=document_id,
+            )
             if initial_document:
                 report.document = initial_document
             report.save()
             messages.success(request, 'Обращение отправлено. Спасибо!')
-            return redirect('feedback:my_list')
+            return redirect('feedback:my_detail', report_id=report.pk)
     else:
         form = FeedbackCreateFormSimple()
 
@@ -75,6 +119,7 @@ def feedback_create(request: HttpRequest) -> HttpResponse:
         {
             'form': form,
             'document': initial_document,
+            'source_path': source_path,
         },
     )
 
@@ -83,6 +128,23 @@ def feedback_create(request: HttpRequest) -> HttpResponse:
 def feedback_my_list(request: HttpRequest) -> HttpResponse:
     reports = FeedbackReport.objects.filter(author=request.user).order_by('-created_at')[:200]
     return render(request, 'feedback/my_list.html', {'reports': reports})
+
+
+@login_required
+def feedback_my_detail(request: HttpRequest, report_id) -> HttpResponse:
+    report = get_object_or_404(
+        FeedbackReport.objects.select_related('document', 'handled_by'),
+        pk=report_id,
+        author=request.user,
+    )
+    return render(
+        request,
+        'feedback/my_detail.html',
+        {
+            'report': report,
+            'context_pretty': report.context or {},
+        },
+    )
 
 
 def _require_feedback_staff(request: HttpRequest) -> None:

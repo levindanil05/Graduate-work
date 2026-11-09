@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load feedback_tags %}
 
 {% block title %}О сервисе{% endblock %}
 
@@ -11,7 +12,7 @@
     {% if branding.support_email %}
     <p>По вопросам работы сервиса: <a href="mailto:{{ branding.support_email }}">{{ branding.support_email }}</a></p>
     {% else %}
-    <p>Вопросы можно отправить через раздел <a href="{% url 'feedback:create' %}">обращений</a> (после входа).</p>
+    <p>Вопросы можно отправить через раздел <a href="{% feedback_create_url %}">обращений</a> (после входа).</p>
     {% endif %}
 </div>
 {% endblock %}

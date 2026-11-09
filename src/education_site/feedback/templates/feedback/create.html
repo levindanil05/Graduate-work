@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load i18n %}
 
 {% block title %}Новое обращение{% endblock %}
 
@@ -9,11 +8,37 @@
 {% if document %}
 <p class="hint">Связано с документом: <strong>{{ document.canonical_name }}</strong></p>
 {% endif %}
+{% if source_path %}
+<p class="hint">Страница, с которой открыта форма: <code>{{ source_path }}</code></p>
+{% else %}
+<p class="hint">Исходная страница не указана (форма открыта напрямую).</p>
+{% endif %}
 
-<form method="post" class="form-stack">
+<form method="post" class="form-stack card">
     {% csrf_token %}
     {% if document %}<input type="hidden" name="document_id" value="{{ document.pk }}">{% endif %}
-    {{ form.as_p }}
+    {% if source_path %}<input type="hidden" name="source" value="{{ source_path }}">{% endif %}
+
+    {% if form.non_field_errors %}
+    <div class="field-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-field">
+        <label for="id_kind">Тип</label>
+        {{ form.kind }}
+        {{ form.kind.errors }}
+    </div>
+    <div class="form-field">
+        <label for="id_subject">Тема</label>
+        {{ form.subject }}
+        {{ form.subject.errors }}
+    </div>
+    <div class="form-field">
+        <label for="id_body">Текст обращения</label>
+        {{ form.body }}
+        {{ form.body.errors }}
+    </div>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Отправить</button>
         <a class="btn btn-ghost" href="{% url 'feedback:my_list' %}">Мои обращения</a>

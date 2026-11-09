@@ -271,3 +271,43 @@ msgstr "Разрешить сильное отклонение от автома
 
 msgid "Apply name and rename file"
 msgstr "Применить имя и переименовать файл"
+
+# feedback/forms.py
+msgid "Kind"
+msgstr "Тип"
+
+msgid "Subject"
+msgstr "Тема"
+
+msgid "Message"
+msgstr "Текст обращения"
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "Staff reply"
+msgstr "Ответ"
+
+msgid "Author"
+msgstr "Автор"
+
+msgid "Created"
+msgstr "Создано"
+
+msgid "Handled by"
+msgstr "Обработал"
+
+msgid "Handled at"
+msgstr "Обработано"
+
+msgid "Context"
+msgstr "Контекст"
+
+msgid "Document"
+msgstr "Документ"
+
+msgid "Feedback report"
+msgstr "Обращение"
+
+msgid "Feedback reports"
+msgstr "Обращения"

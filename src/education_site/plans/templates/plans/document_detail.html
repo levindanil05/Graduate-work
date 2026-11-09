@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load plans_extras %}
+{% load feedback_tags %}
 
 {% block title %}{{ document.canonical_name }}{% endblock %}
 
@@ -42,7 +43,7 @@
         <a class="btn btn-muted" href="{% url 'plans:transition_status' document.id %}?target={{ rule.to_status.value }}">{{ label }}</a>
         {% endif %}
     {% endfor %}
-    <a class="btn btn-muted" href="{% url 'feedback:create' %}?document_id={{ document.id }}">Сообщить о проблеме</a>
+    <a class="btn btn-muted" href="{% feedback_create_url document.id %}">Сообщить о проблеме</a>
     {% endif %}
 </div>
 

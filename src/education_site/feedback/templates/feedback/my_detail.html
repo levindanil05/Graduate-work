@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Обращение: {{ report.subject }}{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title=report.subject %}
+<p class="breadcrumbs">
+    <a href="{% url 'feedback:my_list' %}">Мои обращения</a>
+    · {{ report.subject }}
+</p>
+
+<div class="card">
+    <p><strong>Тип:</strong> {{ report.get_kind_display }}</p>
+    <p><strong>Статус:</strong> {{ report.get_status_display }}</p>
+    <p><strong>Отправлено:</strong> {{ report.created_at|date:"d.m.Y H:i" }}</p>
+    {% if report.document %}
+    <p><strong>Документ:</strong>
+        <a href="{% url 'plans:document_detail' report.document_id %}">{{ report.document.canonical_name }}</a>
+    </p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Текст обращения</h2>
+    <div class="prose"><p style="white-space:pre-wrap">{{ report.body }}</p></div>
+</div>
+
+<div class="card">
+    <h2>Ответ</h2>
+    {% if report.staff_reply %}
+    <p style="white-space:pre-wrap">{{ report.staff_reply }}</p>
+    {% if report.handled_at %}
+    <p class="hint">Ответ дан {{ report.handled_at|date:"d.m.Y H:i" }}{% if report.handled_by %} ({{ report.handled_by.get_username }}){% endif %}</p>
+    {% endif %}
+    {% else %}
+    <p class="hint">Ответа пока нет.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Контекст</h2>
+    <ul>
+        <li>Страница: <code>{% firstof context_pretty.source_path context_pretty.page_url "—" %}</code></li>
+        {% if context_pretty.route_name %}<li>Маршрут: {{ context_pretty.route_name }}</li>{% endif %}
+        {% if context_pretty.document_status %}<li>Статус документа: {{ context_pretty.document_status }}</li>{% endif %}
+        {% if context_pretty.user_role %}<li>Роль: {{ context_pretty.user_role }}</li>{% endif %}
+    </ul>
+</div>
+
+<p class="toolbar-row">
+    <a class="btn btn-ghost" href="{% url 'feedback:my_list' %}">К списку</a>
+</p>
+{% endblock %}
