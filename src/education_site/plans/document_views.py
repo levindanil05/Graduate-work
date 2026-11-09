@@ -10,6 +10,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import user_can_edit_document, user_can_upload
+from accounts.permissions import user_can_hard_delete
 from documents.entities import DocumentVersion as DomainVersion
 from documents.entities import VersionStatus
 from documents.factory import build_document_service
@@ -103,6 +104,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
     current = document.current_version
     can_edit = user_can_edit_document(request)
     can_upload = user_can_upload(request)
+    can_hard_delete = user_can_hard_delete(request.user.pk if request.user.is_authenticated else None)
     transition_choices = _transitions_for_request(request, current)
     open_name_editor = request.GET.get('edit_name') == '1'
     naming_values = naming_values_from_meta(
@@ -246,6 +248,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'approved_version': document.approved_version,
             'can_edit': can_edit,
             'can_upload': can_upload,
+            'can_hard_delete': can_hard_delete,
             'process_diagram': process_diagram_context(
                 current_status=current.status if current else None,
                 include_transitions=False,

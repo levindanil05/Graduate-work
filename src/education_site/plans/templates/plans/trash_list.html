@@ -37,7 +37,17 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th></th>
+                <th>
+                    <label class="sr-only" for="trash-select-all">Выбрать всё</label>
+                    <input
+                        id="trash-select-all"
+                        type="checkbox"
+                        form="trash-bulk-form"
+                        title="Выбрать всё"
+                        aria-label="Выбрать всё"
+                        data-select-all="trash-bulk-form"
+                    >
+                </th>
                 <th>Имя</th>
                 <th>Каноническое имя</th>
                 <th>Обновлён</th>
@@ -49,7 +59,7 @@
             {% for row in rows %}
             {% with v=row.version %}
             <tr>
-                <td><input form="trash-bulk-form" type="checkbox" name="version_ids" value="{{ v.pk }}"></td>
+                <td><input form="trash-bulk-form" type="checkbox" name="version_ids" value="{{ v.pk }}" data-select-item></td>
                 <td>{{ v.source_filename }}</td>
                 <td>{{ v.document.canonical_name }}</td>
                 <td>{{ v.updated_at|date:"d.m.Y H:i" }}</td>
@@ -88,4 +98,31 @@
     {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block body_scripts %}
+<script>
+(function () {
+  var master = document.querySelector('[data-select-all="trash-bulk-form"]');
+  if (!master) return;
+  var formId = master.getAttribute('form') || 'trash-bulk-form';
+  function items() {
+    return document.querySelectorAll(
+      'input[data-select-item][form="' + formId + '"], #' + formId + ' input[data-select-item]'
+    );
+  }
+  master.addEventListener('change', function () {
+    items().forEach(function (el) {
+      el.checked = master.checked;
+    });
+  });
+  document.addEventListener('change', function (ev) {
+    if (!ev.target || !ev.target.matches('input[data-select-item]')) return;
+    var list = Array.prototype.slice.call(items());
+    if (!list.length) return;
+    master.checked = list.every(function (el) { return el.checked; });
+    master.indeterminate = !master.checked && list.some(function (el) { return el.checked; });
+  });
+})();
+</script>
 {% endblock %}

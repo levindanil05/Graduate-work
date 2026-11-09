@@ -51,10 +51,21 @@
     <a class="btn btn-primary" href="{% url 'plans:transition_status' document.id %}">Изменить статус</a>
     {% endif %}
     {% for rule, label in transition_choices %}
-        {% if rule.action.value == 'move_to_trash' or rule.action.value == 'restore' %}
-        <a class="btn btn-muted" href="{% url 'plans:transition_status' document.id %}?target={{ rule.to_status.value }}">{{ label }}</a>
+        {% if rule.action.value == 'move_to_trash' %}
+        <a class="btn btn-secondary" href="{% url 'plans:transition_status' document.id %}?target={{ rule.to_status.value }}">{{ label }}</a>
+        {% elif rule.action.value == 'restore' %}
+        <a class="btn btn-primary" href="{% url 'plans:transition_status' document.id %}?target={{ rule.to_status.value }}">{{ label }}</a>
         {% endif %}
     {% endfor %}
+    {% if current_version.status == 'trashed' %}
+    <a class="btn btn-ghost" href="{% url 'plans:trash_list' %}">Открыть корзину</a>
+    {% if can_hard_delete %}
+    <form method="post" action="{% url 'plans:hard_delete_document' document.id %}" class="inline-form" onsubmit="return confirm('Удалить документ и файлы безвозвратно? Это действие нельзя отменить.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Удалить безвозвратно</button>
+    </form>
+    {% endif %}
+    {% endif %}
     <a class="btn btn-muted" href="{% feedback_create_url document.id %}">Сообщить о проблеме</a>
     {% endif %}
 </div>
