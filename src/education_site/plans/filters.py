@@ -18,7 +18,7 @@ class PlxDocumentFilter(django_filters.FilterSet):
         label='Кафедра',
     )
     year_start = django_filters.NumberFilter(
-        field_name='extracted_metadata__year_start',
+        method='filter_year_start',
         label='Год начала',
     )
     direction_code = django_filters.CharFilter(
@@ -36,6 +36,16 @@ class PlxDocumentFilter(django_filters.FilterSet):
     class Meta:
         model = DocumentVersion
         fields = []
+
+    def filter_year_start(self, queryset, name, value):
+        # NumberFilter cleans to Decimal; JSONField lookups cannot encode Decimal.
+        if value is None or value == '':
+            return queryset
+        year = int(value)
+        return queryset.filter(
+            Q(extracted_metadata__year_start=year)
+            | Q(extracted_metadata__year_start=str(year))
+        )
 
     def filter_faculty(self, queryset, name, value):
         if not value:
