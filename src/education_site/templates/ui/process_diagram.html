@@ -1,8 +1,9 @@
-{% with d=diagram|default:process_diagram %}
+{# Единый контракт: переменная diagram (словарь stages / side_stages / transitions). #}
+{% if diagram %}
 <div class="process-diagram card">
-    {% if d.stages %}
+    {% if diagram.stages %}
     <ol class="process-stages">
-        {% for stage in d.stages %}
+        {% for stage in diagram.stages %}
         <li class="process-stage{% if stage.is_current %} is-current{% endif %}">
             <span class="process-stage-label">{{ stage.label }}</span>
             {% if stage.is_current %}<span class="process-stage-you">Вы здесь</span>{% endif %}
@@ -10,9 +11,9 @@
         {% if not forloop.last %}<li class="process-arrow" aria-hidden="true">→</li>{% endif %}
         {% endfor %}
     </ol>
-    {% if d.side_stages %}
+    {% if diagram.side_stages %}
     <ul class="process-side">
-        {% for stage in d.side_stages %}
+        {% for stage in diagram.side_stages %}
         <li class="process-stage{% if stage.is_current %} is-current{% endif %}">
             {{ stage.label }}{% if stage.is_current %} — сейчас{% endif %}
         </li>
@@ -21,7 +22,7 @@
     {% endif %}
     {% endif %}
 
-    {% if d.transitions or transitions %}
+    {% if diagram.transitions %}
     <h3 class="process-table-title">Переходы статусов</h3>
     <table class="data-table">
         <thead>
@@ -33,7 +34,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for row in d.transitions|default:transitions %}
+            {% for row in diagram.transitions %}
             <tr>
                 <td>{{ row.from }}</td>
                 <td>{{ row.action }}</td>
@@ -45,4 +46,4 @@
     </table>
     {% endif %}
 </div>
-{% endwith %}
+{% endif %}
