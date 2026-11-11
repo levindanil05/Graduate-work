@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from uuid import UUID
+
+from django.db import IntegrityError
 
 from documents import models as orm
 from documents.entities import (
@@ -15,6 +18,10 @@ from documents.entities import (
     WorkflowAction,
     WorkflowTransition,
 )
+
+
+def _normalize_alias(alias: str) -> str:
+    return Path((alias or '').strip()).name.strip()
 
 
 def _to_domain_document(record: orm.Document) -> Document:
@@ -72,12 +79,26 @@ class DjangoDocumentRepository:
                 'approved_version_id': document.approved_version_id,
             },
         )
-        desired_aliases = set(document.identity.aliases)
+        desired_aliases = {
+            normalized
+            for raw in document.identity.aliases
+            if (normalized := _normalize_alias(raw))
+        }
         record.aliases.exclude(alias__in=desired_aliases).delete()
         for alias in desired_aliases:
-            orm.DocumentAlias.objects.get_or_create(document=record, alias=alias)
+            existing = orm.DocumentAlias.objects.filter(alias=alias).first()
+            if existing is not None:
+                if existing.document_id == record.pk:
+                    continue
+                # Globally unique: do not steal another plan's synonym.
+                continue
+            try:
+                orm.DocumentAlias.objects.create(document=record, alias=alias)
+            except IntegrityError:
+                # Race with another writer — leave the winner, do not fail the upload.
+                continue
         document.updated_at = record.updated_at
-        return _to_domain_document(record)
+        return _to_domain_document(orm.Document.objects.prefetch_related('aliases').get(pk=record.pk))
 
     def list_for_type(self, document_type: DocumentType) -> list[Document]:
         qs = orm.Document.objects.filter(document_type=document_type.value).prefetch_related('aliases')

@@ -186,12 +186,12 @@ class DocumentApplicationService:
         return result
 
     def _merge_identity_aliases(self, document: Document, *names: str) -> Document:
-        aliases = set(document.identity.aliases)
+        aliases = {Path((a or '').strip()).name.strip() for a in document.identity.aliases}
+        aliases.discard('')
         for name in names:
-            cleaned = (name or '').strip()
-            if cleaned:
-                aliases.add(cleaned)
-                aliases.add(Path(cleaned).name)
+            basename = Path((name or '').strip()).name.strip()
+            if basename:
+                aliases.add(basename)
         document.identity = DocumentIdentity(
             canonical_name=document.identity.canonical_name,
             aliases=tuple(sorted(aliases)),
@@ -270,53 +270,54 @@ class DocumentApplicationService:
                 status = VersionStatus.INVALID
                 parse_errors = (str(exc),)
 
-        new_version = DocumentVersion(
-            id=version_id,
-            document_id=document.id,
-            status=status,
-            version_number=next_version_number,
-            source_filename=request.source_filename,
-            storage_key=storage_key,
-            content_hash=file_hash,
-            created_by_user_id=request.user_id,
-            change_comment=request.change_comment,
-            extracted_metadata=metadata,
-            error_messages=parse_errors,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-        )
-        saved_version = self.versions.save(new_version)
+        with transaction.atomic():
+            new_version = DocumentVersion(
+                id=version_id,
+                document_id=document.id,
+                status=status,
+                version_number=next_version_number,
+                source_filename=request.source_filename,
+                storage_key=storage_key,
+                content_hash=file_hash,
+                created_by_user_id=request.user_id,
+                change_comment=request.change_comment,
+                extracted_metadata=metadata,
+                error_messages=parse_errors,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+            )
+            saved_version = self.versions.save(new_version)
 
-        document.current_version_id = saved_version.id
-        document.updated_at = datetime.now()
-        self.documents.save(document)
+            document.current_version_id = saved_version.id
+            document.updated_at = datetime.now()
+            self.documents.save(document)
 
-        upload_name = request.source_filename
-        if request.link_source_as_alias or request.skip_filename_check:
-            canon_meta = ''
-            if isinstance(metadata.get('canonical_filename'), str):
-                canon_meta = metadata['canonical_filename']
-            self._merge_identity_aliases(document, upload_name, canon_meta)
+            upload_name = request.source_filename
+            if request.link_source_as_alias or request.skip_filename_check:
+                canon_meta = ''
+                if isinstance(metadata.get('canonical_filename'), str):
+                    canon_meta = metadata['canonical_filename']
+                self._merge_identity_aliases(document, upload_name, canon_meta)
 
-        self._apply_attach_name_policy(
-            document=document,
-            version=saved_version,
-            upload_name=upload_name,
-            metadata=metadata,
-            name_policy=request.name_policy,
-        )
-        # Reload after possible rename/policy updates.
-        document = self.documents.get(document.id) or document
-        saved_version = self.versions.get_active_version(document.id) or saved_version
-
-        if saved_version.status == VersionStatus.INVALID:
-            first_error = saved_version.error_messages[0] if saved_version.error_messages else ""
-            self.mark_invalid_after_parse_failure(
+            self._apply_attach_name_policy(
                 document=document,
                 version=saved_version,
-                parse_error=first_error,
-                previous_status=VersionStatus.NEW,
+                upload_name=upload_name,
+                metadata=metadata,
+                name_policy=request.name_policy,
             )
+            # Reload after possible rename/policy updates.
+            document = self.documents.get(document.id) or document
+            saved_version = self.versions.get_active_version(document.id) or saved_version
+
+            if saved_version.status == VersionStatus.INVALID:
+                first_error = saved_version.error_messages[0] if saved_version.error_messages else ""
+                self.mark_invalid_after_parse_failure(
+                    document=document,
+                    version=saved_version,
+                    parse_error=first_error,
+                    previous_status=VersionStatus.NEW,
+                )
 
         return UploadResult(
             document_id=document.id,
