@@ -20,6 +20,7 @@ class VersionStatus(StrEnum):
     NEW = "new"
     ON_REVIEW = "on_review"
     NEEDS_FIX = "needs_fix"
+    AGREED = "agreed"
     APPROVED = "approved"
     ARCHIVED = "archived"
     INVALID = "invalid"
@@ -37,6 +38,7 @@ class WorkflowAction(StrEnum):
     SUBMIT = "submit"
     REQUEST_FIX = "request_fix"
     RESUBMIT = "resubmit"
+    AGREE = "agree"
     APPROVE = "approve"
     ARCHIVE = "archive"
     MARK_INVALID = "mark_invalid"
@@ -61,7 +63,8 @@ class Document:
     """
 
     id: UUID = field(default_factory=uuid4)
-    document_type: DocumentType = DocumentType.GENERIC
+    # Код из реестра видов (documents.document_types). Известные константы — DocumentType.
+    document_type: str = DocumentType.GENERIC
     identity: DocumentIdentity = field(default_factory=lambda: DocumentIdentity(canonical_name=""))
     # Global explanation is always shown with current version.
     explanation: str = ""

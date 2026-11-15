@@ -2,6 +2,8 @@ import uuid
 
 from django.db import models
 
+from documents.document_types import label_for, validate_document_type
+
 
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создан')
@@ -15,6 +17,7 @@ class VersionStatus(models.TextChoices):
     NEW = 'new', 'Новый'
     ON_REVIEW = 'on_review', 'На проверке'
     NEEDS_FIX = 'needs_fix', 'Требует доработки'
+    AGREED = 'agreed', 'Согласован УО'
     APPROVED = 'approved', 'Утверждён'
     ARCHIVED = 'archived', 'В архиве'
     INVALID = 'invalid', 'Некорректный'
@@ -30,8 +33,8 @@ class Document(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document_type = models.CharField(
         max_length=80,
-        choices=DocumentType.choices,
         db_index=True,
+        validators=[validate_document_type],
         verbose_name='Тип',
     )
     canonical_name = models.CharField(max_length=255, db_index=True, verbose_name='Каноническое имя')
@@ -43,7 +46,7 @@ class Document(TimestampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='+',
-        verbose_name='Текущая версия',
+        verbose_name='Текущая редакция',
     )
     approved_version = models.ForeignKey(
         'DocumentVersion',
@@ -51,7 +54,7 @@ class Document(TimestampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='+',
-        verbose_name='Утверждённая версия',
+        verbose_name='Утверждённая редакция',
     )
 
     class Meta:
@@ -60,6 +63,9 @@ class Document(TimestampedModel):
 
     def __str__(self) -> str:
         return self.canonical_name
+
+    def get_document_type_display(self) -> str:
+        return label_for(self.document_type)
 
 
 class DocumentAlias(models.Model):
@@ -86,18 +92,18 @@ class DocumentVersion(TimestampedModel):
         db_index=True,
         verbose_name='Статус',
     )
-    version_number = models.PositiveIntegerField(verbose_name='Номер версии')
+    version_number = models.PositiveIntegerField(verbose_name='Номер редакции')
     source_filename = models.CharField(max_length=255, verbose_name='Имя файла')
     storage_key = models.CharField(max_length=500, verbose_name='Ключ хранения')
     content_hash = models.CharField(max_length=128, db_index=True, verbose_name='Хэш содержимого')
     created_by_user_id = models.IntegerField(null=True, blank=True, verbose_name='Автор')
-    change_comment = models.TextField(blank=True, default='', verbose_name='Комментарий к версии')
+    change_comment = models.TextField(blank=True, default='', verbose_name='Комментарий к редакции')
     extracted_metadata = models.JSONField(default=dict, blank=True, verbose_name='Реквизиты')
     error_messages = models.JSONField(default=list, blank=True, verbose_name='Ошибки')
 
     class Meta:
-        verbose_name = 'Версия документа'
-        verbose_name_plural = 'Версии документов'
+        verbose_name = 'Редакция документа'
+        verbose_name_plural = 'Редакции документов'
         constraints = [
             models.UniqueConstraint(
                 fields=['document', 'version_number'],
@@ -161,7 +167,7 @@ class DiscussionThread(TimestampedModel):
         DocumentVersion,
         on_delete=models.CASCADE,
         related_name='discussion_thread',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
 
     class Meta:
@@ -193,7 +199,7 @@ class WorkflowTransition(TimestampedModel):
         DocumentVersion,
         on_delete=models.CASCADE,
         related_name='workflow_transitions',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
     from_status = models.CharField(max_length=32, verbose_name='Из статуса')
     to_status = models.CharField(max_length=32, verbose_name='В статус')

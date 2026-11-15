@@ -30,6 +30,7 @@
                 <th>Из статуса</th>
                 <th>Действие</th>
                 <th>В статус</th>
+                <th>Кто может перевести</th>
                 <th>Комментарий</th>
             </tr>
         </thead>
@@ -39,6 +40,7 @@
                 <td>{{ row.from }}</td>
                 <td>{{ row.action }}</td>
                 <td>{{ row.to }}</td>
+                <td>{{ row.roles }}</td>
                 <td>{% if row.requires_comment %}обязателен{% else %}по желанию{% endif %}</td>
             </tr>
             {% endfor %}

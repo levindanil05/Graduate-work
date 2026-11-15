@@ -9,7 +9,7 @@ from documents.models import DocumentVersion
 
 
 class Command(BaseCommand):
-    help = 'Копирует файлы версий в неизменяемые ключи documents/{doc_id}/{version_id}.plx'
+    help = 'Копирует файлы редакций в неизменяемые ключи documents/{doc_id}/{version_id}.plx'
 
     def handle(self, *args, **options):
         storage = UserfilesStoragePort()

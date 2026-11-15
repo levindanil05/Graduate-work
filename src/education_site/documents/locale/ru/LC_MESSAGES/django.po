@@ -17,6 +17,9 @@ msgstr ""
 msgid "No naming strategy for document type: %(type)s"
 msgstr "Нет стратегии именования для типа документа: %(type)s"
 
+msgid "Unknown document type: %(type)s"
+msgstr "Неизвестный вид документа: %(type)s"
+
 msgid "Document not found"
 msgstr "Документ не найден"
 
@@ -27,13 +30,13 @@ msgid "Filename is not compatible with the document identity"
 msgstr "Имя файла не совместимо с идентификатором документа"
 
 msgid "Duplicate version was expected but not found"
-msgstr "Ожидалась дублирующая версия, но она не найдена"
+msgstr "Ожидалась дублирующая редакция, но она не найдена"
 
 msgid "User cannot update the document explanation"
 msgstr "Пользователь не может изменить пояснение документа"
 
 msgid "Version not found"
-msgstr "Версия не найдена"
+msgstr "Редакция не найдена"
 
 msgid "Parent document not found"
 msgstr "Родительский документ не найден"
@@ -48,10 +51,10 @@ msgid "Comment is required for this transition"
 msgstr "Для этого перехода требуется комментарий"
 
 msgid "Version uploaded"
-msgstr "Версия загружена"
+msgstr "Редакция загружена"
 
 msgid "Duplicate upload detected; existing version returned"
-msgstr "Обнаружена повторная загрузка; возвращена существующая версия"
+msgstr "Обнаружена повторная загрузка; возвращена существующая редакция"
 
 msgid "Metadata extraction failed"
 msgstr "Не удалось извлечь метаданные"
@@ -66,8 +69,11 @@ msgstr "Отправить на доработку"
 msgid "Resubmit for review"
 msgstr "Повторно отправить на проверку"
 
-msgid "Approve"
-msgstr "Утвердить"
+msgid "Agree (academic office)"
+msgstr "Согласовать (учебный отдел)"
+
+msgid "Approve (printed form received)"
+msgstr "Утвердить (получена печатная форма)"
 
 msgid "Archive"
 msgstr "В архив"
@@ -83,6 +89,15 @@ msgstr "Восстановить"
 
 msgid "Hard delete"
 msgstr "Удалить физически"
+
+msgid "Superseded by a new approved version"
+msgstr "Заменена новой утверждённой редакцией"
+
+msgid "Duplicate content; existing version returned"
+msgstr "Такое содержимое уже есть; возвращена существующая редакция"
+
+msgid "Trusted version imported"
+msgstr "Доверенная редакция импортирована"
 
 # documents/plx_identity.py — match reasons
 msgid "Exact filename match"
@@ -139,7 +154,7 @@ msgid "Cancel upload"
 msgstr "Отменить загрузку"
 
 msgid "New version for plan:"
-msgstr "Новая версия для плана:"
+msgstr "Новая редакция для плана:"
 
 msgid "← Back to card"
 msgstr "← К карточке"
@@ -213,7 +228,7 @@ msgid "User cannot rename this document"
 msgstr "Пользователь не может переименовать этот документ"
 
 msgid "Document has no current version"
-msgstr "У документа нет текущей версии"
+msgstr "У документа нет текущей редакции"
 
 msgid "Proposed name differs too much from the automatic canonical name. Adjust fields or confirm a large deviation."
 msgstr "Предлагаемое имя слишком сильно отличается от автоматически вычисленного. Измените поля или подтвердите сильное отклонение."
@@ -242,7 +257,7 @@ msgid "Uploaded file name does not match the canonical pattern. Please review an
 msgstr "Имя загруженного файла не соответствует каноническому. Проверьте поля и примените предложенное имя."
 
 msgid "New version metadata yields a different name («%(auto)s») than the plan name («%(plan)s»). You can update the name via requisites on the plan card if needed."
-msgstr "Реквизиты новой версии дают другое имя («%(auto)s»), чем имя плана («%(plan)s»). При необходимости обновите имя через реквизиты на карточке плана."
+msgstr "Реквизиты новой редакции дают другое имя («%(auto)s»), чем имя плана («%(plan)s»). При необходимости обновите имя через реквизиты на карточке плана."
 
 # plans/templates/plans/_name_policy_fields.html
 msgid "Change file name (optional)"
@@ -252,10 +267,10 @@ msgid "If you do not change anything, the existing plan name is kept."
 msgstr "Если ничего не менять, сохраняется имя плана."
 
 msgid "File name for this version"
-msgstr "Имя файла для этой версии"
+msgstr "Имя файла для этой редакции"
 
 msgid "By default the existing plan name is kept. You can take the uploaded file name or rebuild the name from the new version metadata."
-msgstr "По умолчанию сохраняется имя плана. Можно взять имя загруженного файла или собрать имя заново по реквизитам новой версии."
+msgstr "По умолчанию сохраняется имя плана. Можно взять имя загруженного файла или собрать имя заново по реквизитам новой редакции."
 
 msgid "Plan name:"
 msgstr "Имя плана:"
@@ -264,7 +279,7 @@ msgid "Uploaded file:"
 msgstr "Загруженный файл:"
 
 msgid "New version metadata yields a different name:"
-msgstr "Реквизиты новой версии дают другое имя:"
+msgstr "Реквизиты новой редакции дают другое имя:"
 
 msgid "Name from file requisites:"
 msgstr "Имя по реквизитам файла:"
@@ -282,7 +297,7 @@ msgid "Use uploaded file name"
 msgstr "Взять имя загруженного файла"
 
 msgid "Update name from new version metadata «%(name)s»"
-msgstr "Обновить имя по реквизитам новой версии «%(name)s»"
+msgstr "Обновить имя по реквизитам новой редакции «%(name)s»"
 
 # plans/templates/plans/_canonical_name_editor.html
 msgid "File name and canonicity"

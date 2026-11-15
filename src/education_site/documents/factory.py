@@ -14,6 +14,7 @@ from documents.strategies import GenericNamingStrategy, PlxNamingStrategy
 
 
 def build_document_service() -> DocumentApplicationService:
+    """Стратегию имени и экстрактор выбирает реестр settings.DOCUMENT_TYPES."""
     from accounts.permissions import RolePermissionService
 
     return DocumentApplicationService(

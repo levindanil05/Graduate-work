@@ -40,6 +40,18 @@ TRANSITION_RULES: tuple[TransitionRule, ...] = (
     ),
     TransitionRule(
         from_status=VersionStatus.ON_REVIEW,
+        to_status=VersionStatus.AGREED,
+        action=WorkflowAction.AGREE,
+        requires_comment=False,
+    ),
+    TransitionRule(
+        from_status=VersionStatus.AGREED,
+        to_status=VersionStatus.NEEDS_FIX,
+        action=WorkflowAction.REQUEST_FIX,
+        requires_comment=True,
+    ),
+    TransitionRule(
+        from_status=VersionStatus.AGREED,
         to_status=VersionStatus.APPROVED,
         action=WorkflowAction.APPROVE,
         requires_comment=False,

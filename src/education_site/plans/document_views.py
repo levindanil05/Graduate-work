@@ -263,7 +263,7 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
     document = _get_document(document_id)
     current = document.current_version
     if current is None:
-        raise Http404('У документа нет текущей версии')
+        raise Http404('У документа нет текущей редакции')
 
     domain_version = _domain_version_stub(current)
     allowed = list_allowed_transitions_for_user(
@@ -332,7 +332,7 @@ def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
 
     document = _get_document(document_id)
     if document.current_version is None:
-        raise Http404('Нет актуальной версии')
+        raise Http404('Нет актуальной редакции')
     version = document.current_version
     if not RolePermissionService().can_download(request.user.pk, version):
         raise PermissionDenied('Скачивание недоступно')

@@ -1,13 +1,15 @@
 """Роли пользователей (Django Groups) и матрица прав по planing-2605010 §10.13.
 
-Управляющий: как рецензент + синхронизация внешних хранилищ;
-без управления пользователями и без физического удаления.
+Согласование («Согласован УО») и утверждение («Утверждён») — только рецензент
+учебного отдела. Управляющий может отправить на доработку и работает с
+синхронизацией внешних хранилищ; без управления пользователями и без
+физического удаления.
 """
 from __future__ import annotations
 
 from enum import StrEnum
 
-from documents.entities import VersionStatus, WorkflowAction
+from documents.entities import WorkflowAction
 
 
 class Role(StrEnum):
@@ -40,6 +42,7 @@ ROLE_WORKFLOW_ACTIONS: dict[Role, frozenset[WorkflowAction]] = {
     Role.REVIEWER: frozenset(
         {
             WorkflowAction.REQUEST_FIX,
+            WorkflowAction.AGREE,
             WorkflowAction.APPROVE,
             WorkflowAction.MOVE_TO_TRASH,
             WorkflowAction.RESTORE,
@@ -48,7 +51,6 @@ ROLE_WORKFLOW_ACTIONS: dict[Role, frozenset[WorkflowAction]] = {
     Role.MANAGER: frozenset(
         {
             WorkflowAction.REQUEST_FIX,
-            WorkflowAction.APPROVE,
             WorkflowAction.MOVE_TO_TRASH,
             WorkflowAction.RESTORE,
         }

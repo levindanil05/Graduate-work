@@ -75,7 +75,7 @@ class CanonicityStatus:
     auto_canonical: str
     source_differs: bool
     document_differs: bool
-    # Имя плана сознательно сохранено, но реквизиты текущей версии дают другое автоимя.
+    # Имя плана сознательно сохранено, но реквизиты текущей редакции дают другое автоимя.
     plan_vs_auto_differs: bool = False
 
 

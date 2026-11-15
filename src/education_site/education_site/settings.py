@@ -298,6 +298,26 @@ YANDEX_DISK_MIKE_RW_BASE_PATH = os.getenv('YANDEX_DISK_MIKE_RW_BASE_PATH') or '/
 # Trash retention
 # ---------------------------------------------------------------------------
 
+# Виды документов. Новый простой вид (файл + редакции + общее согласование)
+# добавляется записью сюда, без правки кода. Ключи naming_strategy и
+# metadata_extractor должны существовать в documents.document_types.
+DOCUMENT_TYPES = [
+    {
+        'code': 'plx',
+        'label': 'Учебный план (PLX)',
+        'file_extensions': ['.plx'],
+        'naming_strategy': 'plx',
+        'metadata_extractor': 'plx',
+    },
+    {
+        'code': 'generic',
+        'label': 'Общий документ',
+        'file_extensions': [],
+        'naming_strategy': 'filename',
+        'metadata_extractor': None,
+    },
+]
+
 TRASH_RETENTION_DAYS = int(os.getenv('TRASH_RETENTION_DAYS', '30'))
 DEFAULT_PAGE_SIZE = int(os.getenv('DEFAULT_PAGE_SIZE', '50'))
 SYNC_SCHEDULE_INTERVAL_SECONDS = int(os.getenv('SYNC_SCHEDULE_INTERVAL_SECONDS', '3600'))

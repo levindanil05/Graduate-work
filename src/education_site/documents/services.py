@@ -49,14 +49,14 @@ NAME_POLICIES = frozenset(
 @dataclass
 class UploadRequest:
     user_id: int
-    document_type: DocumentType
+    document_type: str
     file_path: Path
     source_filename: str
     # Comment about uploaded changes (not discussion message).
     change_comment: str = ""
     # Пользователь подтвердил привязку к документу — имя файла может отличаться.
     skip_filename_check: bool = False
-    # Добавить исходное/каноническое имя в алиасы после успешной загрузки версии.
+    # Добавить исходное/каноническое имя в алиасы после успешной загрузки редакции.
     link_source_as_alias: bool = False
     # При привязке к существующему плану: keep_plan | use_upload | from_metadata.
     name_policy: str = NAME_POLICY_KEEP_PLAN
@@ -104,19 +104,45 @@ class DocumentApplicationService:
         self.naming_strategies = naming_strategies
         self.permissions = permissions
 
-    def _resolve_naming_strategy(self, document_type: DocumentType) -> DocumentNamingStrategy:
-        for strategy in self.naming_strategies:
-            if strategy.supports(document_type):
-                return strategy
-        raise DomainValidationError(
-            _('No naming strategy for document type: %(type)s') % {'type': document_type.value}
+    def _resolve_naming_strategy(self, document_type: str) -> DocumentNamingStrategy:
+        from documents.document_types import (
+            DocumentTypeConfigError,
+            UnknownDocumentType,
+            build_naming_strategy,
+            type_code,
         )
 
-    def _resolve_metadata_extractor(self, document_type: DocumentType) -> MetadataExtractor | None:
-        for extractor in self.metadata_extractors:
-            if extractor.supports(document_type):
-                return extractor
-        return None
+        code = type_code(document_type)
+        try:
+            return build_naming_strategy(code)
+        except UnknownDocumentType:
+            raise DomainValidationError(
+                _('Unknown document type: %(type)s') % {'type': code}
+            ) from None
+        except DocumentTypeConfigError:
+            raise DomainValidationError(
+                _('No naming strategy for document type: %(type)s') % {'type': code}
+            ) from None
+
+    def _resolve_metadata_extractor(self, document_type: str) -> MetadataExtractor | None:
+        from documents.document_types import (
+            DocumentTypeConfigError,
+            UnknownDocumentType,
+            build_metadata_extractor,
+            type_code,
+        )
+
+        code = type_code(document_type)
+        try:
+            return build_metadata_extractor(code)
+        except UnknownDocumentType:
+            raise DomainValidationError(
+                _('Unknown document type: %(type)s') % {'type': code}
+            ) from None
+        except DocumentTypeConfigError:
+            raise DomainValidationError(
+                _('No naming strategy for document type: %(type)s') % {'type': code}
+            ) from None
 
     def suggest_document_matches(self, request: UploadRequest):
         """Кандидаты для подтверждения пользователем (PLX — по имени и метаданным)."""
@@ -938,7 +964,7 @@ class DocumentApplicationService:
         return saved
 
     def hard_delete_document(self, *, document_id: UUID, actor_user_id: int) -> None:
-        """Безвозвратное удаление документа, версий и файлов в USERFILES_ROOT."""
+        """Безвозвратное удаление документа, редакций и файлов в USERFILES_ROOT."""
         from documents import models as orm
         from documents.audit import log_action
 

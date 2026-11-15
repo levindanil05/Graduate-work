@@ -72,6 +72,6 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f'Сканировано файлов: {scanned}'))
         self.stdout.write(self.style.SUCCESS(f'Создано документов: {created}'))
-        self.stdout.write(self.style.SUCCESS(f'Новых версий: {updated}'))
+        self.stdout.write(self.style.SUCCESS(f'Новых редакций: {updated}'))
         self.stdout.write(self.style.WARNING(f'Дубликатов: {duplicates}'))
         self.stdout.write(self.style.WARNING(f'Ошибок: {failed}'))

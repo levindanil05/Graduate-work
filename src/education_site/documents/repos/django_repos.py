@@ -28,7 +28,7 @@ def _to_domain_document(record: orm.Document) -> Document:
     aliases = tuple(record.aliases.values_list('alias', flat=True))
     return Document(
         id=record.id,
-        document_type=DocumentType(record.document_type),
+        document_type=record.document_type,
         identity=DocumentIdentity(
             canonical_name=record.canonical_name,
             aliases=aliases,
@@ -71,7 +71,7 @@ class DjangoDocumentRepository:
         record, _ = orm.Document.objects.update_or_create(
             pk=document.id,
             defaults={
-                'document_type': document.document_type.value,
+                'document_type': str(document.document_type),
                 'canonical_name': document.identity.canonical_name,
                 'explanation': document.explanation,
                 'extra_data': document.extra_data,
@@ -101,7 +101,7 @@ class DjangoDocumentRepository:
         return _to_domain_document(orm.Document.objects.prefetch_related('aliases').get(pk=record.pk))
 
     def list_for_type(self, document_type: DocumentType) -> list[Document]:
-        qs = orm.Document.objects.filter(document_type=document_type.value).prefetch_related('aliases')
+        qs = orm.Document.objects.filter(document_type=str(document_type)).prefetch_related('aliases')
         return [_to_domain_document(record) for record in qs]
 
 

@@ -1,4 +1,7 @@
+from django import forms
 from django.contrib import admin
+
+from documents.document_types import list_specs
 
 from .audit import ActionLog
 from .models import (
@@ -10,6 +13,20 @@ from .models import (
     DocumentVersion,
     WorkflowTransition,
 )
+
+
+class DocumentAdminForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [('', '---------'), *[(spec.code, spec.label) for spec in list_specs()]]
+        current = getattr(self.instance, 'document_type', '') or ''
+        if current and current not in {code for code, _label in choices}:
+            choices.append((current, current))
+        self.fields['document_type'].widget = forms.Select(choices=choices)
 
 
 class DocumentAliasInline(admin.TabularInline):
@@ -34,6 +51,7 @@ class DocumentVersionInline(admin.TabularInline):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
+    form = DocumentAdminForm
     list_display = ('canonical_name', 'document_type', 'current_version', 'updated_at')
     list_filter = ('document_type',)
     search_fields = ('canonical_name', 'aliases__alias')

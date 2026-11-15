@@ -128,7 +128,7 @@ def bulk_registry_action(request: HttpRequest) -> HttpResponse:
     redirect_to = 'plans:trash_list' if redirect_trash else 'plans:plan_list'
 
     if not version_ids:
-        messages.warning(request, 'Не выбрано ни одной версии.')
+        messages.warning(request, 'Не выбрано ни одной редакции.')
         return redirect(redirect_to)
 
     if action not in {'trash', 'restore', 'hard_delete'}:
@@ -228,7 +228,7 @@ def bulk_registry_action(request: HttpRequest) -> HttpResponse:
             object_type='document_version',
             metadata={'count': success, 'version_ids': version_ids},
         )
-        messages.success(request, f'Обработано версий: {success}.')
+        messages.success(request, f'Обработано редакций: {success}.')
     if skipped:
         messages.info(request, f'Уже были в корзине: {skipped}.')
     if errors:

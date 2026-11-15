@@ -97,7 +97,7 @@ class ExternalConnection(TimestampedModel):
     )
     enabled = models.BooleanField(default=True, verbose_name='Подключение включено')
     pull_enabled = models.BooleanField(default=False, verbose_name='Получать изменения')
-    push_enabled = models.BooleanField(default=False, verbose_name='Отправлять утверждённые версии')
+    push_enabled = models.BooleanField(default=False, verbose_name='Отправлять утверждённые редакции')
     schedule_enabled = models.BooleanField(default=False, verbose_name='Запускать по расписанию')
     manual_run_enabled = models.BooleanField(default=True, verbose_name='Разрешить ручной запуск')
     on_active_missing = models.CharField(
@@ -151,7 +151,7 @@ class RemoteObjectSnapshot(TimestampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='remote_snapshots',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
 
     class Meta:
@@ -177,7 +177,7 @@ class ExternalReplica(TimestampedModel):
         'documents.DocumentVersion',
         on_delete=models.CASCADE,
         related_name='external_replicas',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
     remote_path = models.CharField(max_length=500, verbose_name='Путь на диске')
     role = models.CharField(max_length=16, choices=RemoteRole.choices, verbose_name='Роль')
@@ -244,7 +244,7 @@ class OutboundIntent(TimestampedModel):
         'documents.DocumentVersion',
         on_delete=models.CASCADE,
         related_name='outbound_intents',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
     kind = models.CharField(max_length=32, choices=OutboundKind.choices, verbose_name='Тип')
     idempotency_key = models.CharField(max_length=128, unique=True, verbose_name='Ключ идемпотентности')
@@ -276,7 +276,7 @@ class SyncConflict(TimestampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name='sync_conflicts',
-        verbose_name='Версия',
+        verbose_name='Редакция',
     )
     remote_path = models.CharField(max_length=500, blank=True, default='', verbose_name='Путь на диске')
     summary = models.TextField(verbose_name='Описание')

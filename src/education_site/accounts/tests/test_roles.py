@@ -19,6 +19,7 @@ class RolePermissionMatrixTests(TestCase):
         self.version_new = DocumentVersion(status=VersionStatus.NEW)
         self.version_review = DocumentVersion(status=VersionStatus.ON_REVIEW)
         self.version_fix = DocumentVersion(status=VersionStatus.NEEDS_FIX)
+        self.version_agreed = DocumentVersion(status=VersionStatus.AGREED)
 
     def _user_with(self, *roles: Role) -> User:
         user = User.objects.create_user(
@@ -46,25 +47,40 @@ class RolePermissionMatrixTests(TestCase):
             self.perms.can_transition(user.id, self.version_fix, VersionStatus.ON_REVIEW)
         )
         self.assertFalse(
+            self.perms.can_transition(user.id, self.version_review, VersionStatus.AGREED)
+        )
+        self.assertFalse(
             self.perms.can_transition(user.id, self.version_review, VersionStatus.APPROVED)
         )
 
-    def test_reviewer_can_approve_not_upload(self):
+    def test_reviewer_can_agree_and_approve_not_upload(self):
         user = self._user_with(Role.REVIEWER)
         self.assertFalse(self.perms.can_upload_version(user.id, self.document))
         self.assertTrue(
+            self.perms.can_transition(user.id, self.version_review, VersionStatus.AGREED)
+        )
+        self.assertFalse(
             self.perms.can_transition(user.id, self.version_review, VersionStatus.APPROVED)
+        )
+        self.assertTrue(
+            self.perms.can_transition(user.id, self.version_agreed, VersionStatus.APPROVED)
         )
         self.assertTrue(
             self.perms.can_transition(user.id, self.version_review, VersionStatus.NEEDS_FIX)
         )
         self.assertFalse(self.perms.can_manage_sync(user.id))
 
-    def test_manager_can_sync_not_hard_delete(self):
+    def test_manager_can_sync_not_approve(self):
         user = self._user_with(Role.MANAGER)
         self.assertTrue(self.perms.can_manage_sync(user.id))
         self.assertTrue(
-            self.perms.can_transition(user.id, self.version_review, VersionStatus.APPROVED)
+            self.perms.can_transition(user.id, self.version_review, VersionStatus.NEEDS_FIX)
+        )
+        self.assertFalse(
+            self.perms.can_transition(user.id, self.version_review, VersionStatus.AGREED)
+        )
+        self.assertFalse(
+            self.perms.can_transition(user.id, self.version_agreed, VersionStatus.APPROVED)
         )
         self.assertFalse(self.perms.can_hard_delete(user.id, self.document))
         self.assertFalse(self.perms.can_upload_version(user.id, self.document))

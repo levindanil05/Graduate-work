@@ -3,8 +3,9 @@ from __future__ import annotations
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from documents.entities import VersionStatus
-from documents.workflow_rules import ANY_STATUS, TRANSITION_RULES
+from accounts.roles import ROLE_DISPLAY_NAMES, ROLE_WORKFLOW_ACTIONS, Role
+from documents.entities import VersionStatus, WorkflowAction
+from documents.workflow_rules import ANY_STATUS, TRANSITION_RULES, TransitionRule
 from documents.workflow_ui import action_label, target_status_label
 
 from .glossary import all_terms, get_term
@@ -14,9 +15,32 @@ MAIN_FLOW_STATUSES: tuple[VersionStatus, ...] = (
     VersionStatus.NEW,
     VersionStatus.ON_REVIEW,
     VersionStatus.NEEDS_FIX,
+    VersionStatus.AGREED,
     VersionStatus.APPROVED,
     VersionStatus.ARCHIVED,
 )
+
+# Порядок ролей в справке. Администратор показывается, только если больше некому.
+_HELP_ROLE_ORDER: tuple[Role, ...] = (
+    Role.CURRICULUM_DEVELOPER,
+    Role.REVIEWER,
+    Role.MANAGER,
+    Role.READER,
+)
+
+
+def roles_who_can(rule: TransitionRule) -> str:
+    """Подпись «кто может» для перехода. Источник — та же матрица, что и права."""
+    names = [
+        ROLE_DISPLAY_NAMES[role]
+        for role in _HELP_ROLE_ORDER
+        if rule.action in ROLE_WORKFLOW_ACTIONS.get(role, frozenset())
+    ]
+    if not names and rule.action in ROLE_WORKFLOW_ACTIONS.get(Role.ADMINISTRATOR, frozenset()):
+        names.append(ROLE_DISPLAY_NAMES[Role.ADMINISTRATOR])
+    if not names and rule.action == WorkflowAction.HARD_DELETE:
+        names.append(ROLE_DISPLAY_NAMES[Role.ADMINISTRATOR])
+    return ', '.join(names) if names else '—'
 
 
 def process_diagram_context(
@@ -57,13 +81,23 @@ def process_diagram_context(
     if current == VersionStatus.NEW:
         next_hint = 'Следующий шаг: отправить план на проверку в учебный отдел.'
     elif current == VersionStatus.ON_REVIEW:
-        next_hint = 'Сейчас план проверяет учебный отдел: утвердит или отправит на доработку.'
+        next_hint = (
+            'Сейчас план проверяет учебный отдел: согласует или отправит на доработку.'
+        )
     elif current == VersionStatus.NEEDS_FIX:
         next_hint = 'Нужна доработка на кафедре, затем повторная отправка на проверку.'
+    elif current == VersionStatus.AGREED:
+        next_hint = (
+            'Учебный отдел согласовал редакцию. Утверждение — когда получена печатная форма '
+            'с печатью ректора. До этого редакцию можно вернуть на доработку.'
+        )
     elif current == VersionStatus.APPROVED:
-        next_hint = 'План утверждён. При замене новой утверждённой версией эта уйдёт в архив.'
+        next_hint = (
+            'Получена печатная форма с печатью ректора. Эта редакция отгружается в резервное '
+            'облако, а прежняя утверждённая редакция уходит в архив.'
+        )
     elif current == VersionStatus.ARCHIVED:
-        next_hint = 'Версия в архиве — сохранена в истории.'
+        next_hint = 'Редакция в архиве — сохранена в истории.'
     elif current == VersionStatus.INVALID:
         next_hint = 'Файл не удалось прочитать. Загрузите исправленный файл или отправьте в корзину.'
     elif current == VersionStatus.TRASHED:
@@ -82,6 +116,7 @@ def process_diagram_context(
                     'from': from_label,
                     'to': target_status_label(rule.to_status),
                     'action': action_label(rule.action),
+                    'roles': roles_who_can(rule),
                     'requires_comment': rule.requires_comment,
                 }
             )
