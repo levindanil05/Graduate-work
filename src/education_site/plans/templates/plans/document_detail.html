@@ -43,7 +43,7 @@
 
 <div class="toolbar">
     {% if current_version %}
-    <a class="btn" href="{% url 'plans:download_current' document.id %}">Скачать актуальную</a>
+    <a class="btn" href="{{ current_download_href }}">Скачать актуальную</a>
     {% if can_upload %}
     <a class="btn" href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую редакцию</a>
     {% endif %}
@@ -102,14 +102,16 @@
         </tr>
     </thead>
     <tbody>
-        {% for version in versions %}
+        {% for row in version_rows %}
+        {% with version=row.version %}
         <tr class="{% if current_version and version.id == current_version.id %}current{% endif %}">
             <td>{{ version.version_number }}{% if current_version and version.id == current_version.id %} (текущая){% endif %}</td>
             <td>{{ version.updated_at|date:"d.m.Y H:i" }}</td>
             <td>{{ version.get_status_display }}</td>
             <td>{{ version.source_filename }}</td>
-            <td><a href="{% url 'plans:download_version' document.id version.id %}">Скачать</a></td>
+            <td><a href="{{ row.download_href }}">Скачать</a></td>
         </tr>
+        {% endwith %}
         {% empty %}
         <tr><td colspan="5">{% include "ui/empty_state.html" with message="Редакций пока нет. Загрузите файл — первая редакция появится здесь." %}</td></tr>
         {% endfor %}

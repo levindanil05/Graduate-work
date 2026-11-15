@@ -680,6 +680,17 @@ class DocumentApplicationService:
             except ImportError:
                 pass
 
+        if target_status == VersionStatus.TRASHED:
+            try:
+                keys = [
+                    v.storage_key
+                    for v in self.versions.list_for_document(document.id)
+                    if v.storage_key
+                ]
+                self.storage.revoke_direct_urls(keys)
+            except Exception:  # noqa: BLE001 — отзыв ссылок не должен ломать переход
+                pass
+
         return saved_version
 
     def import_trusted_plx(
@@ -982,6 +993,11 @@ class DocumentApplicationService:
         storage_keys = [v.storage_key for v in record.versions.all() if v.storage_key]
         canonical = record.canonical_name
         record_id = str(record.pk)
+
+        try:
+            self.storage.revoke_direct_urls(storage_keys)
+        except Exception:  # noqa: BLE001
+            pass
 
         record.delete()
 

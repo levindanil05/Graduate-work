@@ -208,8 +208,8 @@ class ReconciliationService:
             version.source_filename,
         )
         storage = self.documents.storage
-        local = storage.resolve_path(version.storage_key)
-        self.provider.upload(str(local), active_path, overwrite=True)
+        with storage.local_copy(version.storage_key) as local:
+            self.provider.upload(str(local), active_path, overwrite=True)
         self._upsert_replica(version, active_path, RemoteRole.ACTIVE, ReplicaSyncState.IN_SYNC)
         intent.desired_remote_path = active_path
         intent.save(update_fields=['desired_remote_path', 'updated_at'])

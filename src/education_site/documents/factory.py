@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from documents.infra.extractors import PlxMetadataExtractor
 from documents.infra.hashing import HashingService
-from documents.infra.storage import UserfilesStoragePort
+from documents.infra.storage import build_storage_port
 from documents.repos.django_repos import (
     DjangoDiscussionRepository,
     DjangoDocumentRepository,
@@ -22,7 +22,7 @@ def build_document_service() -> DocumentApplicationService:
         versions=DjangoVersionRepository(),
         workflow=DjangoWorkflowRepository(),
         discussions=DjangoDiscussionRepository(),
-        storage=UserfilesStoragePort(),
+        storage=build_storage_port(),
         hashing=HashingService(),
         metadata_extractors=[PlxMetadataExtractor()],
         naming_strategies=[PlxNamingStrategy(), GenericNamingStrategy()],

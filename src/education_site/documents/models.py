@@ -221,3 +221,21 @@ class DocumentTypeStrategy(models.Model):
     class Meta:
         verbose_name = 'Стратегия типа документа'
         verbose_name_plural = 'Стратегии типов документов'
+
+
+class StorageShareLink(TimestampedModel):
+    """Кэш публичной ссылки Nextcloud на файл редакции (режим direct)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    storage_key = models.CharField(max_length=512, unique=True, db_index=True, verbose_name='Ключ хранения')
+    share_id = models.CharField(max_length=64, verbose_name='ID ссылки Nextcloud')
+    token = models.CharField(max_length=128, verbose_name='Токен')
+    url = models.TextField(verbose_name='URL скачивания')
+    expires_at = models.DateTimeField(db_index=True, verbose_name='Действует до')
+
+    class Meta:
+        verbose_name = 'Ссылка скачивания хранилища'
+        verbose_name_plural = 'Ссылки скачивания хранилища'
+
+    def __str__(self) -> str:
+        return f'{self.storage_key} → {self.token}'

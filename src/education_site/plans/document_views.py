@@ -4,7 +4,7 @@ from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
@@ -14,7 +14,7 @@ from accounts.permissions import user_can_hard_delete
 from documents.entities import DocumentVersion as DomainVersion
 from documents.entities import VersionStatus
 from documents.factory import build_document_service
-from documents.infra.storage import UserfilesStoragePort
+from documents.infra.storage import build_storage_port
 from documents.models import DiscussionThread, Document, DocumentVersion, WorkflowTransition
 from documents.services import DomainValidationError
 from documents.workflow_ui import (
@@ -96,6 +96,47 @@ def _transitions_for_request(request: HttpRequest, current: DocumentVersion | No
         version=_domain_version_stub(current),
     )
     return [(rule, transition_label(rule)) for rule in rules]
+
+
+def _direct_download_urls_for_document(
+    request: HttpRequest,
+    document: Document,
+) -> dict:
+    """Прямые ссылки Nextcloud для текущей и утверждённой редакции (без копирования файла)."""
+    from accounts.permissions import RolePermissionService
+
+    urls: dict[str, str] = {}
+    if not request.user.is_authenticated:
+        return urls
+    if document.current_version and document.current_version.status == VersionStatus.TRASHED.value:
+        return urls
+
+    permissions = RolePermissionService()
+    storage = build_storage_port()
+    candidates = []
+    if document.current_version is not None:
+        candidates.append(document.current_version)
+    if (
+        document.approved_version is not None
+        and (
+            document.current_version is None
+            or document.approved_version_id != document.current_version_id
+        )
+    ):
+        candidates.append(document.approved_version)
+
+    for version in candidates:
+        if not version.storage_key:
+            continue
+        if not permissions.can_download(request.user.pk, version):
+            continue
+        try:
+            url = storage.direct_download_url(version.storage_key, version.source_filename)
+        except Exception:  # noqa: BLE001
+            url = None
+        if url:
+            urls[str(version.id)] = url
+    return urls
 
 
 @login_required
@@ -227,6 +268,24 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         else document.canonical_name
     )
 
+    from django.urls import reverse
+
+    direct_download_urls = _direct_download_urls_for_document(request, document)
+    current_download_href = None
+    if current is not None:
+        current_download_href = direct_download_urls.get(str(current.id)) or reverse(
+            'plans:download_current',
+            args=[document.id],
+        )
+
+    version_rows = []
+    for version in document.versions.order_by('-version_number'):
+        href = direct_download_urls.get(str(version.id)) or reverse(
+            'plans:download_version',
+            args=[document.id, version.id],
+        )
+        version_rows.append({'version': version, 'download_href': href})
+
     return render(
         request,
         'plans/document_detail.html',
@@ -235,6 +294,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'display_name': display_name,
             'current_version': current,
             'versions': document.versions.order_by('-version_number'),
+            'version_rows': version_rows,
             'workflow_history': _workflow_history(document),
             'discussion_messages': _discussion_messages(current),
             'transition_choices': transition_choices,
@@ -249,6 +309,7 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'can_edit': can_edit,
             'can_upload': can_upload,
             'can_hard_delete': can_hard_delete,
+            'current_download_href': current_download_href,
             'process_diagram': process_diagram_context(
                 current_status=current.status if current else None,
                 include_transitions=False,
@@ -314,19 +375,28 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
     )
 
 
-def _file_response(version: DocumentVersion) -> FileResponse:
-    path = UserfilesStoragePort().resolve_path(version.storage_key)
-    if not path.exists():
-        raise Http404('Файл не найден на диске')
+def _file_response(version: DocumentVersion) -> HttpResponse:
+    storage = build_storage_port()
+    if not version.storage_key or not storage.exists(version.storage_key):
+        raise Http404('Файл не найден')
+    direct = storage.direct_download_url(version.storage_key, version.source_filename)
+    if direct:
+        response = HttpResponseRedirect(direct)
+        response['Cache-Control'] = 'no-store'
+        return response
+    try:
+        stream = storage.open_stream(version.storage_key)
+    except FileNotFoundError as exc:
+        raise Http404('Файл не найден') from exc
     return FileResponse(
-        path.open('rb'),
+        stream,
         as_attachment=True,
         filename=version.source_filename,
     )
 
 
 @login_required
-def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
+def download_current(request: HttpRequest, document_id: UUID) -> HttpResponse:
     from accounts.permissions import RolePermissionService
     from django.core.exceptions import PermissionDenied
 
@@ -340,7 +410,7 @@ def download_current(request: HttpRequest, document_id: UUID) -> FileResponse:
 
 
 @login_required
-def download_version(request: HttpRequest, document_id: UUID, version_id: UUID) -> FileResponse:
+def download_version(request: HttpRequest, document_id: UUID, version_id: UUID) -> HttpResponse:
     from accounts.permissions import RolePermissionService
     from django.core.exceptions import PermissionDenied
 

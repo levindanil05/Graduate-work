@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import shutil
-
 from django.core.management.base import BaseCommand
 
-from documents.infra.storage import UserfilesStoragePort
+from documents.infra.storage import UserfilesStoragePort, build_storage_port
 from documents.models import DocumentVersion
 
 
@@ -12,7 +10,7 @@ class Command(BaseCommand):
     help = 'Копирует файлы редакций в неизменяемые ключи documents/{doc_id}/{version_id}.plx'
 
     def handle(self, *args, **options):
-        storage = UserfilesStoragePort()
+        storage = build_storage_port()
         migrated = 0
         skipped = 0
 
@@ -21,16 +19,14 @@ class Command(BaseCommand):
             if version.storage_key == target_key:
                 skipped += 1
                 continue
-            source = storage.resolve_path(version.storage_key)
-            if not source.exists():
+            if not storage.exists(version.storage_key):
                 self.stderr.write(f'Файл не найден: {version.storage_key} (v{version.id})')
                 continue
-            dest = storage.resolve_path(target_key)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.exists():
+            if storage.exists(target_key):
                 skipped += 1
                 continue
-            shutil.copy2(source, dest)
+            with storage.local_copy(version.storage_key) as source:
+                storage.save(source, target_key)
             version.storage_key = target_key
             version.save(update_fields=['storage_key', 'updated_at'])
             migrated += 1

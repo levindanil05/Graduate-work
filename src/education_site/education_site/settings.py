@@ -64,6 +64,63 @@ MEDIA_URL = os.getenv('MEDIA_URL', '/files/')
 MEDIA_ROOT = Path(os.getenv('MEDIA_ROOT', str(BASE_DIR / 'files')))
 USERFILES_ROOT = Path(os.getenv('USERFILES_ROOT', str(BASE_DIR / 'userfiles')))
 
+# --- Основное хранилище файлов редакций (local | nextcloud) ---
+# См. docs/nextcloud-setup.md и .env.example.
+
+
+def _env_tls_verify(name: str, default: bool | str = True) -> bool | str:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    value = str(raw).strip()
+    lowered = value.lower()
+    if lowered in {'1', 'true', 'yes', 'on'}:
+        return True
+    if lowered in {'0', 'false', 'no', 'off'}:
+        return False
+    return value  # путь к CA
+
+
+STORAGE_BACKEND = (os.getenv('STORAGE_BACKEND') or 'local').strip().lower()
+if STORAGE_BACKEND not in {'local', 'nextcloud'}:
+    raise RuntimeError(
+        f'STORAGE_BACKEND must be "local" or "nextcloud", got {STORAGE_BACKEND!r}'
+    )
+
+NEXTCLOUD_URL = (os.getenv('NEXTCLOUD_URL') or '').rstrip('/')
+NEXTCLOUD_PUBLIC_URL = (os.getenv('NEXTCLOUD_PUBLIC_URL') or '').rstrip('/') or NEXTCLOUD_URL
+NEXTCLOUD_USER = (os.getenv('NEXTCLOUD_USER') or '').strip()
+NEXTCLOUD_APP_PASSWORD = (os.getenv('NEXTCLOUD_APP_PASSWORD') or '').strip()
+NEXTCLOUD_ROOT = (os.getenv('NEXTCLOUD_ROOT') or 'plans').strip().strip('/')
+NEXTCLOUD_DOWNLOAD_MODE = (os.getenv('NEXTCLOUD_DOWNLOAD_MODE') or 'direct').strip().lower()
+if NEXTCLOUD_DOWNLOAD_MODE not in {'direct', 'proxy'}:
+    raise RuntimeError(
+        f'NEXTCLOUD_DOWNLOAD_MODE must be "direct" or "proxy", got {NEXTCLOUD_DOWNLOAD_MODE!r}'
+    )
+_share_ttl_raw = int(os.getenv('NEXTCLOUD_SHARE_TTL_DAYS', '7'))
+if _share_ttl_raw < 1 or _share_ttl_raw > 7:
+    raise RuntimeError('NEXTCLOUD_SHARE_TTL_DAYS must be an integer from 1 to 7')
+NEXTCLOUD_SHARE_TTL_DAYS = _share_ttl_raw
+_nc_temp = (os.getenv('NEXTCLOUD_TEMP_DIR') or '').strip()
+NEXTCLOUD_TEMP_DIR = Path(_nc_temp) if _nc_temp else (USERFILES_ROOT / '.tmp')
+NEXTCLOUD_TIMEOUT_SECONDS = int(os.getenv('NEXTCLOUD_TIMEOUT_SECONDS', '30'))
+NEXTCLOUD_VERIFY_TLS = _env_tls_verify('NEXTCLOUD_VERIFY_TLS', default=True)
+
+if STORAGE_BACKEND == 'nextcloud':
+    missing = [
+        name
+        for name, value in (
+            ('NEXTCLOUD_URL', NEXTCLOUD_URL),
+            ('NEXTCLOUD_USER', NEXTCLOUD_USER),
+            ('NEXTCLOUD_APP_PASSWORD', NEXTCLOUD_APP_PASSWORD),
+        )
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(
+            'STORAGE_BACKEND=nextcloud requires: ' + ', '.join(missing)
+        )
+
 # ---------------------------------------------------------------------------
 # Security (prod)
 # ---------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, BinaryIO, Protocol
 from uuid import UUID
 
 from .entities import (
@@ -49,6 +50,24 @@ class StoragePort(Protocol):
         ...
 
     def rename(self, storage_key: str, new_basename: str) -> str:
+        ...
+
+    def exists(self, storage_key: str) -> bool:
+        ...
+
+    def local_copy(self, storage_key: str) -> AbstractContextManager[Path]:
+        """Yields a local Path for the object; cleans up temp files when done."""
+        ...
+
+    def open_stream(self, storage_key: str) -> BinaryIO:
+        ...
+
+    def direct_download_url(self, storage_key: str, filename: str) -> str | None:
+        """Public download URL if the backend supports it; otherwise None. Does not copy the file."""
+        ...
+
+    def revoke_direct_urls(self, storage_keys: list[str]) -> None:
+        """Revoke cached public download links for the given keys (no-op if unsupported)."""
         ...
 
 

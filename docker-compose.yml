@@ -62,7 +62,7 @@ services:
       [
         "bash",
         "-c",
-        "while true; do python manage.py run_external_sync_worker --once; python manage.py purge_trashed; sleep ${WORKER_SLEEP_SECONDS:-300}; done",
+        "while true; do python manage.py run_external_sync_worker --once; python manage.py purge_trashed; python manage.py purge_storage_shares; sleep ${WORKER_SLEEP_SECONDS:-300}; done",
       ]
 
   backup:
