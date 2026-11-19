@@ -5,7 +5,7 @@
 или Nextcloud (`STORAGE_BACKEND=nextcloud`). Резервная публикация на Яндекс.Диск
 не заменяется: см. [external-storage-sync.md](external-storage-sync.md).
 
-Переменные окружения описаны в [`src/education_site/.env.example`](../src/education_site/.env.example).
+Переменные окружения описаны в [`src/vstuplans/.env.example`](../src/vstuplans/.env.example).
 
 ---
 
@@ -181,7 +181,7 @@ NEXTCLOUD_SHARE_TTL_DAYS=7
 NEXTCLOUD_VERIFY_TLS=true
 ```
 
-3. Из каталога `src/education_site`:
+3. Из каталога `src/vstuplans`:
 
 ```bash
 python manage.py check_nextcloud

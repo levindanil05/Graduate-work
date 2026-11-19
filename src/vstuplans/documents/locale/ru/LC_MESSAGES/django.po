@@ -4,7 +4,7 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: education_site\n"
+"Project-Id-Version: vstuplans\n"
 "Report-Msgid-Bugs-To: \n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"

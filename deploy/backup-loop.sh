@@ -8,9 +8,10 @@ mkdir -p /backups
 
 while true; do
   TS="$(date -u +%Y%m%dT%H%MZ)"
-  FILE="/backups/${PGDATABASE}-${TS}.sql.gz"
+  FILE="/backups/${PGDATABASE}-${TS}.dump"
   echo "backup: ${FILE}"
-  pg_dump -Fc "$PGDATABASE" | gzip > "${FILE}"
-  ls -1t /backups/*.sql.gz 2>/dev/null | tail -n +"$((KEEP + 1))" | xargs -r rm -f
+  # -Fc уже сжат; gzip поверх не нужен
+  pg_dump -Fc -f "${FILE}" "$PGDATABASE"
+  ls -1t /backups/*.dump 2>/dev/null | tail -n +"$((KEEP + 1))" | xargs -r rm -f
   sleep "${INTERVAL}"
 done

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / 'src'))
-sys.path.insert(0, str(REPO_ROOT / 'src' / 'education_site'))
+sys.path.insert(0, str(REPO_ROOT / 'src' / 'vstuplans'))
 
 from documents.entities import (  # noqa: E402
     Document,

@@ -1,46 +1,33 @@
-# Продакшен: bind web только на localhost; TLS и rate limit — на хостовом nginx (deploy/nginx/plans.conf).
-# Скопируйте src/education_site/.env.example в .env и задайте секреты.
+# Продакшен за хостовым nginx (TLS, rate limit): deploy/nginx/plans.conf
+# Скопируйте src/vstuplans/.env.example в .env и задайте секреты.
+# Postgres — внешний (сеть pg_vstuplans, хост pg-shared). См. docs/deployment.md.
 
 x-app: &app
   build:
     context: .
-    dockerfile: src/education_site/Dockerfile
+    dockerfile: src/vstuplans/Dockerfile
+  image: vstuplans:${APP_VERSION:-latest}
   env_file:
     - .env
   environment:
-    DJANGO_SETTINGS_MODULE: education_site.settings
+    DJANGO_SETTINGS_MODULE: vstuplans.settings
   volumes:
     - userfiles:/app/userfiles
     - staticfiles:/app/staticfiles
     - ./deploy/entrypoint.sh:/opt/deploy/entrypoint.sh:ro
-  depends_on:
-    db:
-      condition: service_healthy
+  networks:
+    - default
+    - pg_vstuplans
   entrypoint: ["/bin/bash", "/opt/deploy/entrypoint.sh"]
 
 services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-education_site}
-      POSTGRES_USER: ${POSTGRES_USER:-education_site}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-education_site} -d ${POSTGRES_DB:-education_site}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   web:
     <<: *app
     restart: unless-stopped
     command:
       [
         "gunicorn",
-        "education_site.wsgi:application",
+        "vstuplans.wsgi:application",
         "--bind",
         "0.0.0.0:8000",
         "--workers",
@@ -48,16 +35,23 @@ services:
         "--timeout",
         "120",
       ]
-    ports:
-      - "127.0.0.1:8000:8000"
-    volumes:
-      - userfiles:/app/userfiles
-      - staticfiles:/app/staticfiles
-      - ./deploy/entrypoint.sh:/opt/deploy/entrypoint.sh:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   worker:
     <<: *app
     restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
     command:
       [
         "bash",
@@ -66,24 +60,28 @@ services:
       ]
 
   backup:
-    image: postgres:16
+    image: postgres:18-alpine
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      PGHOST: db
-      PGUSER: ${POSTGRES_USER:-education_site}
+      PGHOST: ${PGHOST:-pg-shared}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${POSTGRES_USER:-vstuplans}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
-      PGDATABASE: ${POSTGRES_DB:-education_site}
+      PGDATABASE: ${POSTGRES_DB:-vstuplans}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_KEEP_COUNT: ${BACKUP_KEEP_COUNT:-14}
     volumes:
       - postgres_backups:/backups
       - ./deploy/backup-loop.sh:/opt/backup-loop.sh:ro
+    networks:
+      - pg_vstuplans
     entrypoint: ["/bin/bash", "/opt/backup-loop.sh"]
 
+networks:
+  pg_vstuplans:
+    external: true
+
 volumes:
-  postgres_data:
   postgres_backups:
   userfiles:
   staticfiles:

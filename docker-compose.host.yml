@@ -1,0 +1,10 @@
+# Оверлей для деплоя за хостовым nginx: публикует Gunicorn только на localhost.
+# Использование (продакшен):
+#   docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
+#
+# WEB_PORT задайте в .env (на сервере umu: 8006; 8000 занят vstu_schedule).
+
+services:
+  web:
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8006}:8000"

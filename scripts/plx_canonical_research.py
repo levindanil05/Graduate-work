@@ -26,7 +26,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC = REPO_ROOT / 'src'
 sys.path.insert(0, str(SRC))
-sys.path.insert(0, str(SRC / 'education_site'))
+sys.path.insert(0, str(SRC / 'vstuplans'))
 
 from plans.canonical_name import (  # noqa: E402
     build_canonical_name,
@@ -39,7 +39,7 @@ from plans.canonical_name import (  # noqa: E402
 from plx_parser import parse_plx_file  # noqa: E402
 
 DEFAULT_DIR = REPO_ROOT / 'userfiles'
-DEFAULT_DICT = SRC / 'education_site' / 'plans' / 'data' / 'plx_abbr_dict.yaml'
+DEFAULT_DICT = SRC / 'vstuplans' / 'plans' / 'data' / 'plx_abbr_dict.yaml'
 COVERAGE_THRESHOLD = 0.90
 
 # Ucheb_plan_{code}_{AP}_{profile}_{form}_{term}_{fac}_{dept}_{year}[suffix].plx

@@ -1,5 +1,5 @@
 """
-Django settings for education_site.
+Django settings for vstuplans.
 
 Значения, влияющие на безопасность и окружение, берутся из переменных окружения.
 См. .env.example и docs/deployment.md.
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -126,6 +126,8 @@ if STORAGE_BACKEND == 'nextcloud':
 # ---------------------------------------------------------------------------
 
 SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', default=not DEBUG)
+# Внутренний docker healthcheck ходит по HTTP без X-Forwarded-Proto.
+SECURE_REDIRECT_EXEMPT = [r'^healthz/?$']
 SESSION_COOKIE_SECURE = _env_bool('DJANGO_SESSION_COOKIE_SECURE', default=not DEBUG)
 CSRF_COOKIE_SECURE = _env_bool('DJANGO_CSRF_COOKIE_SECURE', default=not DEBUG)
 SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_SECURE_HSTS_SECONDS', '0' if DEBUG else '31536000'))
@@ -203,7 +205,7 @@ MIDDLEWARE = [
     'accounts.middleware.LoginRateLimitMiddleware',
 ]
 
-ROOT_URLCONF = 'education_site.urls'
+ROOT_URLCONF = 'vstuplans.urls'
 
 TEMPLATES = [
     {
@@ -223,7 +225,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'education_site.wsgi.application'
+WSGI_APPLICATION = 'vstuplans.wsgi.application'
 
 # ---------------------------------------------------------------------------
 # Database
@@ -241,8 +243,8 @@ if DATABASE_URL:
         'default': {
             'ENGINE': engine,
             'NAME': parsed.path.lstrip('/') if engine.endswith('postgresql') else (parsed.path or BASE_DIR / 'db.sqlite3'),
-            'USER': parsed.username or '',
-            'PASSWORD': parsed.password or '',
+            'USER': unquote(parsed.username or ''),
+            'PASSWORD': unquote(parsed.password or ''),
             'HOST': parsed.hostname or '',
             'PORT': str(parsed.port or ''),
         }

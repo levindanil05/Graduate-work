@@ -6,8 +6,9 @@
 ## Структура
 - `src/` — исходный код парсера и main.py
 - `tests/` — тесты для парсера
-- `education_site/` — Django-проект
+- `src/vstuplans/` — Django-проект (сервис согласования учебных планов)
 
 ## Запуск
 ```bash
 python src/main.py
+```

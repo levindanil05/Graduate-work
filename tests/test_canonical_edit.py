@@ -7,7 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / 'src'))
-sys.path.insert(0, str(REPO_ROOT / 'src' / 'education_site'))
+sys.path.insert(0, str(REPO_ROOT / 'src' / 'vstuplans'))
 
 # gettext_lazy нужен Django settings — подставляем простую заглушку до импорта.
 import django

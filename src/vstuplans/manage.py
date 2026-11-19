@@ -6,7 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'education_site.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'vstuplans.settings')
     src_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if src_root not in sys.path:
         sys.path.insert(0, src_root)

@@ -7,9 +7,9 @@ from pathlib import Path
 
 
 def _ensure_src_on_path() -> None:
-    # src/ (родитель education_site) — там лежит plx_parser.py
+    # src/ (родитель vstuplans) — там лежит plx_parser.py
     here = Path(__file__).resolve()
-    src_root = here.parents[3]  # .../src/education_site/documents/infra -> src
+    src_root = here.parents[3]  # .../src/vstuplans/documents/infra -> src
     if str(src_root) not in sys.path:
         sys.path.insert(0, str(src_root))
 

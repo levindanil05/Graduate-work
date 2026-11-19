@@ -2,7 +2,7 @@
 
 Практическая инструкция: как получить OAuth-токен, указать путь к папке и включить два подключения (`uo_readonly` и `mike_rw`).
 
-Архитектура и алгоритм согласования: [external-storage-sync.md](external-storage-sync.md). Пример переменных: [`src/education_site/.env.example`](../src/education_site/.env.example).
+Архитектура и алгоритм согласования: [external-storage-sync.md](external-storage-sync.md). Пример переменных: [`src/vstuplans/.env.example`](../src/vstuplans/.env.example).
 
 ---
 
@@ -94,7 +94,7 @@ print(list(disk.listdir("/")))  # или ваш root_path
 Скопируйте пример и заполните:
 
 ```bash
-cp src/education_site/.env.example src/education_site/.env
+cp src/vstuplans/.env.example src/vstuplans/.env
 ```
 
 Минимум для двух подключений:

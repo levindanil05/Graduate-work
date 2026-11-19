@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PO = ROOT / 'src/education_site/documents/locale/ru/LC_MESSAGES/django.po'
+PO = ROOT / 'src/vstuplans/documents/locale/ru/LC_MESSAGES/django.po'
 MO = PO.with_suffix('.mo')
 
 
