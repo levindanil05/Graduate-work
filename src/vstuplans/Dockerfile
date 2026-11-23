@@ -35,6 +35,8 @@ WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY src/vstuplans/ .
+# Парсер PLX лежит вне каталога Django-проекта (src/plx_parser.py).
+COPY src/plx_parser.py /app/plx_parser.py
 
 RUN mkdir -p /app/staticfiles /app/userfiles \
     && chown -R appuser:appuser /app

@@ -7,11 +7,16 @@ from pathlib import Path
 
 
 def _ensure_src_on_path() -> None:
-    # src/ (родитель vstuplans) — там лежит plx_parser.py
+    # plx_parser.py лежит:
+    # - в репозитории: src/plx_parser.py (parents[3] от infra/)
+    # - в Docker-образе: /app/plx_parser.py рядом с проектом (parents[2] == /app)
     here = Path(__file__).resolve()
-    src_root = here.parents[3]  # .../src/vstuplans/documents/infra -> src
-    if str(src_root) not in sys.path:
-        sys.path.insert(0, str(src_root))
+    project_root = here.parents[2]  # .../src/vstuplans или /app
+    src_root = here.parents[3]  # .../src (локально) или / (в контейнере)
+    for root in (project_root, src_root):
+        root_s = str(root)
+        if root_s not in sys.path:
+            sys.path.insert(0, root_s)
 
 
 def _parse_worker(path: str) -> dict:
