@@ -285,14 +285,14 @@
             Загрузить
         </a>
         {% endif %}
-        {% if slot_row.can_update and slot_row.slot.anchor == 'edition' %}
+        {% if slot_row.can_rebind %}
         <a class="btn" href="{% url 'plans:rebind_companion' document.id %}?slot={{ slot_row.slot.code }}">
             Привязать существующий
         </a>
         {% endif %}
         {% if slot_row.can_view %}
         <a class="btn btn-muted" href="{% url 'plans:document_type_list' slot_row.slot.code %}">
-            Все «{{ slot_row.label }}»
+            Все «{{ slot_row.label_plural }}»
         </a>
         {% endif %}
     </div>

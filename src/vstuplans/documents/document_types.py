@@ -43,6 +43,7 @@ class DocumentTypeSpec:
     metadata_extractor: str | None = None
     companions: tuple[CompanionSlot, ...] = ()
     lifecycle: object | None = None  # LifecycleProfile | None; избегаем цикличного импорта в аннотации
+    label_plural: str = ''
 
 
 PRINTED_FORM_LIFECYCLE = {
@@ -76,6 +77,7 @@ DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
     {
         'code': 'plx',
         'label': 'Учебный план (PLX)',
+        'label_plural': 'Учебные планы',
         'file_extensions': ('.plx',),
         'naming_strategy': 'plx',
         'metadata_extractor': 'plx',
@@ -91,6 +93,7 @@ DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
     {
         'code': 'printed_form',
         'label': 'Печатная форма',
+        'label_plural': 'Печатные формы',
         'file_extensions': ('.pdf', '.xlsx'),
         'naming_strategy': 'filename',
         'metadata_extractor': None,
@@ -99,6 +102,7 @@ DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
     {
         'code': 'generic',
         'label': 'Общий документ',
+        'label_plural': 'Общие документы',
         'file_extensions': (),
         'naming_strategy': 'filename',
         'metadata_extractor': None,
@@ -139,10 +143,13 @@ def list_specs() -> list[DocumentTypeSpec]:
     specs: list[DocumentTypeSpec] = []
     for item in _raw_config():
         extractor = item.get('metadata_extractor') or None
+        label = str(item['label'])
+        plural = str(item.get('label_plural') or '').strip() or label
         specs.append(
             DocumentTypeSpec(
                 code=str(item['code']),
-                label=str(item['label']),
+                label=label,
+                label_plural=plural,
                 file_extensions=tuple(item.get('file_extensions') or ()),
                 naming_strategy=str(item.get('naming_strategy') or 'filename'),
                 metadata_extractor=str(extractor) if extractor else None,
@@ -169,6 +176,14 @@ def is_known(code: str) -> bool:
 def label_for(code: str) -> str:
     try:
         return get_spec(code).label
+    except UnknownDocumentType:
+        return type_code(code)
+
+
+def label_plural_for(code: str) -> str:
+    try:
+        spec = get_spec(code)
+        return spec.label_plural or spec.label
     except UnknownDocumentType:
         return type_code(code)
 

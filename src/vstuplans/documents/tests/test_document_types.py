@@ -16,6 +16,7 @@ from documents.document_types import (
     get_spec,
     is_known,
     label_for,
+    label_plural_for,
     list_specs,
 )
 from documents.entities import VersionStatus
@@ -49,6 +50,8 @@ class DocumentTypeRegistryTests(TestCase):
         self.assertIsNone(get_spec('generic').metadata_extractor)
         self.assertEqual(label_for('plx'), 'Учебный план (PLX)')
         self.assertEqual(label_for('printed_form'), 'Печатная форма')
+        self.assertEqual(label_plural_for('printed_form'), 'Печатные формы')
+        self.assertEqual(get_spec('plx').label_plural, 'Учебные планы')
 
     def test_unknown_type_is_rejected(self):
         self.assertFalse(is_known('memo'))

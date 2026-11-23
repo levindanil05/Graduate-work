@@ -23,6 +23,7 @@ from documents.document_types import (
     companion_slots_for,
     get_spec,
     label_for,
+    label_plural_for,
     list_specs,
     slot_for,
 )
@@ -205,6 +206,37 @@ def upload_companion(request: HttpRequest, document_id: UUID) -> HttpResponse:
     )
 
 
+def _slot_rebind_state(primary: Document, slot_code: str) -> tuple[bool, list]:
+    """Можно ли перепривязать: слот текущей редакции пуст, у другой редакции есть компаньон.
+
+    Возвращает (can_rebind_situation, existing_on_other_editions).
+    """
+    current_id = primary.current_version_id
+    if current_id is None:
+        return False, []
+
+    current_occupied = DocumentRelation.objects.filter(
+        target_document=primary,
+        slot_code=slot_code,
+        is_current=True,
+        target_version_id=current_id,
+    ).exists()
+    if current_occupied:
+        return False, []
+
+    existing = list(
+        DocumentRelation.objects.filter(
+            target_document=primary,
+            slot_code=slot_code,
+            is_current=True,
+        )
+        .exclude(target_version_id=current_id)
+        .select_related('source_document', 'target_version')
+        .order_by('-updated_at')
+    )
+    return bool(existing), existing
+
+
 @login_required
 @require_http_methods(['GET', 'POST'])
 def rebind_companion_view(request: HttpRequest, document_id: UUID) -> HttpResponse:
@@ -218,22 +250,24 @@ def rebind_companion_view(request: HttpRequest, document_id: UUID) -> HttpRespon
     if not user_can_update_of_type(request.user.pk, slot.code):
         raise PermissionDenied('Недостаточно прав для перепривязки')
 
-    # Существующие текущие компаньоны этого слота у данного плана (любая редакция).
-    existing = (
-        DocumentRelation.objects.filter(
-            target_document=primary,
-            slot_code=slot.code,
-            is_current=True,
+    can_rebind_situation, existing = _slot_rebind_state(primary, slot.code)
+    if not can_rebind_situation:
+        messages.info(
+            request,
+            'Перепривязка недоступна: у текущей редакции уже есть документ этого вида '
+            'либо нет компаньона на другой редакции.',
         )
-        .select_related('source_document', 'target_version')
-        .order_by('-updated_at')
-    )
+        return redirect('plans:document_detail', document_id=primary.id)
+
     editions = primary.versions.exclude(status='trashed').order_by('-version_number')
 
     if request.method == 'POST':
         relation_id = request.POST.get('relation_id', '').strip()
         version_id = request.POST.get('version_id', '').strip()
         relation = get_object_or_404(DocumentRelation, pk=relation_id, target_document=primary)
+        if relation.id not in {r.id for r in existing}:
+            messages.error(request, 'Выбранный документ нельзя перепривязать к текущей ситуации.')
+            return redirect('plans:document_detail', document_id=primary.id)
         target_version = get_object_or_404(DocumentVersion, pk=version_id, document_id=primary.id)
         try:
             rebind_companion(relation=relation, target_version=target_version)
@@ -347,13 +381,18 @@ def companion_slots_context(primary: Document, user_id: int | None) -> list[dict
         can_update = user_can_update_of_type(user_id, slot.code) if user_id else False
         can_create = user_can_create_of_type(user_id, slot.code) if user_id else False
         can_view = user_can_view_of_type(user_id, slot.code) if user_id else False
+        can_rebind = False
+        if can_update and slot.anchor == 'edition':
+            can_rebind, _ = _slot_rebind_state(primary, slot.code)
         slots.append(
             {
                 'slot': slot,
                 'label': label_for(slot.code),
+                'label_plural': label_plural_for(slot.code),
                 'relations': by_slot.get(slot.code, []),
                 'can_create': can_create,
                 'can_update': can_update,
+                'can_rebind': can_rebind,
                 'can_view': can_view,
             }
         )

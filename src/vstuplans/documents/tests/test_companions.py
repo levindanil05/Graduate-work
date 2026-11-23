@@ -22,6 +22,7 @@ from documents.models import Document, DocumentRelation, DocumentVersion
 from documents.relations import bind_companion, orphan_companion_queryset, rebind_companion
 from documents.services import DomainValidationError, UploadRequest
 from documents.workflow_rules import get_rule
+from plans.companion_views import companion_slots_context
 
 
 User = get_user_model()
@@ -126,6 +127,29 @@ class CompanionRelationTests(TestCase):
         self.assertEqual(new_rel.target_version_id, self.v2.id)
         rel.refresh_from_db()
         self.assertFalse(rel.is_current)
+
+    def test_rebind_button_only_when_other_edition_has_companion(self):
+        companion = self._make_printed_form()
+        # Текущая редакция — v2, компаньон на v1 → кнопка нужна.
+        bind_companion(
+            companion=companion,
+            primary=self.primary,
+            slot_code='printed_form',
+            target_version=self.v1,
+        )
+        slots = companion_slots_context(self.primary, self.reviewer.id)
+        printed = next(s for s in slots if s['slot'].code == 'printed_form')
+        self.assertTrue(printed['can_rebind'])
+        self.assertEqual(printed['label_plural'], 'Печатные формы')
+
+        # После переноса на текущую v2 — перепривязывать нечего.
+        current_rel = DocumentRelation.objects.get(
+            source_document=companion, is_current=True
+        )
+        rebind_companion(relation=current_rel, target_version=self.v2)
+        slots_after = companion_slots_context(self.primary, self.reviewer.id)
+        printed_after = next(s for s in slots_after if s['slot'].code == 'printed_form')
+        self.assertFalse(printed_after['can_rebind'])
 
     def test_cardinality_blocks_second_on_same_edition(self):
         first = self._make_printed_form('a.pdf')

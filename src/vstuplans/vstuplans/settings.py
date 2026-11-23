@@ -364,6 +364,7 @@ DOCUMENT_TYPES = [
     {
         'code': 'plx',
         'label': 'Учебный план (PLX)',
+        'label_plural': 'Учебные планы',
         'file_extensions': ['.plx'],
         'naming_strategy': 'plx',
         'metadata_extractor': 'plx',
@@ -379,6 +380,7 @@ DOCUMENT_TYPES = [
     {
         'code': 'printed_form',
         'label': 'Печатная форма',
+        'label_plural': 'Печатные формы',
         'file_extensions': ['.pdf', '.xlsx'],
         'naming_strategy': 'filename',
         'metadata_extractor': None,
@@ -411,6 +413,7 @@ DOCUMENT_TYPES = [
     {
         'code': 'generic',
         'label': 'Общий документ',
+        'label_plural': 'Общие документы',
         'file_extensions': [],
         'naming_strategy': 'filename',
         'metadata_extractor': None,
