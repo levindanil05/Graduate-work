@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Загрузить: {{ slot_label }}{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title=slot_label %}
+<p class="breadcrumbs">
+    <a href="{% url 'plans:document_detail' primary.id %}">{{ primary.canonical_name }}</a>
+    · Загрузка
+</p>
+
+<div class="card">
+    {% if version_only %}
+    <p>Новая редакция документа «{{ primary.canonical_name }}».</p>
+    {% else %}
+    <p>Главный документ: <strong>{{ primary.canonical_name }}</strong></p>
+    {% if target_version %}
+    <p>Редакция-якорь: №{{ target_version.version_number }}</p>
+    {% endif %}
+    {% endif %}
+    {% if extensions %}
+    <p class="hint-text">Допустимые файлы: {{ extensions|join:", " }}</p>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% if slot %}
+        <input type="hidden" name="slot" value="{{ slot.code }}">
+        {% endif %}
+        {% if target_version %}
+        <input type="hidden" name="version_id" value="{{ target_version.id }}">
+        {% endif %}
+        <p>
+            <label for="companion_file">Файл</label><br>
+            <input type="file" name="companion_file" id="companion_file" required>
+        </p>
+        <p>
+            <label for="change_comment">Комментарий к редакции</label><br>
+            <textarea name="change_comment" id="change_comment" rows="2" style="width:100%"></textarea>
+        </p>
+        <button type="submit" class="btn btn-primary">Загрузить</button>
+        <a class="btn btn-muted" href="{% url 'plans:document_detail' primary.id %}">Отмена</a>
+    </form>
+</div>
+{% endblock %}

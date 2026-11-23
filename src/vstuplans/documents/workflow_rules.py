@@ -16,6 +16,10 @@ class TransitionRule:
     requires_comment: bool = False
     # Optional guard for "ANY" rules.
     exclude_from: tuple[VersionStatus, ...] = ()
+    # Если задано — роли из профиля вида; иначе ROLE_WORKFLOW_ACTIONS.
+    allowed_roles: frozenset[str] | None = None
+    # Подпись действия из профиля вида (пустая → workflow_ui._ACTION_LABELS).
+    action_label_override: str | None = None
 
 
 # Central table for workflow behavior and UI/action contract.

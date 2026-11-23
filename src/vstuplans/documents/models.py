@@ -85,9 +85,9 @@ class DocumentAlias(models.Model):
 class DocumentVersion(TimestampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
+    # Код статуса — строка без закрытого списка: профиль вида задаёт допустимые коды.
     status = models.CharField(
         max_length=32,
-        choices=VersionStatus.choices,
         default=VersionStatus.NEW,
         db_index=True,
         verbose_name='Статус',
@@ -113,6 +113,12 @@ class DocumentVersion(TimestampedModel):
 
     def __str__(self) -> str:
         return f'{self.document.canonical_name} v{self.version_number}'
+
+    def get_status_display(self) -> str:
+        from documents.lifecycle import status_label_for_type
+
+        doc_type = getattr(self.document, 'document_type', None) if self.document_id else None
+        return status_label_for_type(self.status, doc_type)
 
     def meta_get(self, key: str, default=''):
         return self.extracted_metadata.get(key, default) if self.extracted_metadata else default
@@ -221,6 +227,45 @@ class DocumentTypeStrategy(models.Model):
     class Meta:
         verbose_name = 'Стратегия типа документа'
         verbose_name_plural = 'Стратегии типов документов'
+
+
+class DocumentRelation(TimestampedModel):
+    """Связь компаньона с главным документом (и опционально с редакцией)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source_document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name='relations_as_companion',
+        verbose_name='Компаньон',
+    )
+    target_document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name='relations_as_primary',
+        verbose_name='Главный документ',
+    )
+    target_version = models.ForeignKey(
+        DocumentVersion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='companion_relations',
+        verbose_name='Редакция-якорь',
+    )
+    slot_code = models.CharField(max_length=80, db_index=True, verbose_name='Слот')
+    is_current = models.BooleanField(default=True, db_index=True, verbose_name='Текущая связь')
+
+    class Meta:
+        verbose_name = 'Связь документа'
+        verbose_name_plural = 'Связи документов'
+        indexes = [
+            models.Index(fields=['target_document', 'slot_code', 'is_current']),
+            models.Index(fields=['source_document', 'is_current']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.slot_code}: {self.source_document_id} → {self.target_document_id}'
 
 
 class StorageShareLink(TimestampedModel):

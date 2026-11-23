@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Удалить безвозвратно{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Удалить безвозвратно" %}
+<p class="breadcrumbs">
+    <a href="{% url 'plans:document_detail' document.id %}">{{ document.canonical_name }}</a>
+    · Удаление
+</p>
+
+<div class="card">
+    <p>Документ «{{ document.canonical_name }}» и его файлы будут удалены безвозвратно.</p>
+
+    {% if dependents %}
+    <p>С этим документом связаны:</p>
+    <ul>
+        {% for dep in dependents %}
+        <li>{{ dep.get_document_type_display }}: {{ dep.canonical_name }}</li>
+        {% endfor %}
+    </ul>
+    <p>По умолчанию связи будут сняты, связанные документы останутся в системе (станут «без главного»).</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        {% if dependents %}
+        <p>
+            <label>
+                <input type="checkbox" name="delete_dependents" value="1">
+                Также удалить перечисленные связанные документы
+            </label>
+        </p>
+        {% endif %}
+        <button type="submit" class="btn btn-danger">Удалить безвозвратно</button>
+        <a class="btn btn-muted" href="{% url 'plans:document_detail' document.id %}">Отмена</a>
+    </form>
+</div>
+{% endblock %}

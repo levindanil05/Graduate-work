@@ -15,7 +15,7 @@ from accounts.roles import (
     Role,
 )
 from documents.entities import Document, DocumentVersion, VersionStatus
-from documents.workflow_rules import get_rule
+from documents.lifecycle import get_lifecycle_profile, get_rule_for_type, user_has_lifecycle_role
 
 ROLE_CAN_DOWNLOAD: frozenset[Role] = frozenset(Role)
 ROLE_CAN_MANAGE_FEEDBACK: frozenset[Role] = frozenset({Role.MANAGER, Role.ADMINISTRATOR})
@@ -96,26 +96,70 @@ def user_can_see_external_replicas(user_id: int | None) -> bool:
     return _has_any(user_roles(user_id), ROLE_CAN_SEE_EXTERNAL_REPLICAS)
 
 
+def _document_type_of(document: Document | None, version: DocumentVersion | None = None) -> str | None:
+    if document is not None and getattr(document, 'document_type', None):
+        return str(document.document_type)
+    if version is not None and version.document_id:
+        from documents.models import Document as OrmDocument
+
+        return (
+            OrmDocument.objects.filter(pk=version.document_id)
+            .values_list('document_type', flat=True)
+            .first()
+        )
+    return None
+
+
+def user_can_create_of_type(user_id: int | None, document_type: str) -> bool:
+    roles = user_roles(user_id)
+    profile = get_lifecycle_profile(document_type)
+    return user_has_lifecycle_role(roles, profile.create_roles)
+
+
+def user_can_update_of_type(user_id: int | None, document_type: str) -> bool:
+    roles = user_roles(user_id)
+    profile = get_lifecycle_profile(document_type)
+    return user_has_lifecycle_role(roles, profile.update_roles)
+
+
+def user_can_view_of_type(user_id: int | None, document_type: str) -> bool:
+    roles = user_roles(user_id)
+    profile = get_lifecycle_profile(document_type)
+    return user_has_lifecycle_role(roles, profile.view_roles)
+
+
 class RolePermissionService:
     """Проверка прав по ролям Django Group (planing §10.13)."""
 
     def can_upload_version(self, user_id: int, document: Document) -> bool:
+        doc_type = _document_type_of(document)
+        if doc_type and doc_type != 'plx':
+            return user_can_update_of_type(user_id, doc_type)
         return user_can_upload(user_id)
 
-    def can_download(self, user_id: int, version: DocumentVersion | None = None) -> bool:
-        if not user_can_download(user_id):
-            return False
-        if version is None:
-            return True
-        roles = user_roles(user_id)
-        if Role.ADMINISTRATOR in roles:
-            return True
-        if version.status == VersionStatus.TRASHED:
-            return False
-        return True
+    def can_download(
+        self,
+        user_id: int,
+        version: DocumentVersion | None = None,
+        *,
+        document_type: str | None = None,
+    ) -> bool:
+        if version is not None and version.status == VersionStatus.TRASHED:
+            roles = user_roles(user_id)
+            if Role.ADMINISTRATOR not in roles:
+                return False
+        doc_type = document_type or _document_type_of(None, version)
+        if doc_type:
+            return user_can_view_of_type(user_id, doc_type)
+        return user_can_download(user_id)
 
     def can_transition(
-        self, user_id: int, version: DocumentVersion, to_status: VersionStatus
+        self,
+        user_id: int,
+        version: DocumentVersion,
+        to_status: VersionStatus,
+        *,
+        document_type: str | None = None,
     ) -> bool:
         roles = user_roles(user_id)
         if Role.ADMINISTRATOR in roles:
@@ -128,9 +172,12 @@ class RolePermissionService:
             return False
         if version.status == VersionStatus.TRASHED and to_status != VersionStatus.NEW:
             return False
-        rule = get_rule(version.status, to_status)
+        doc_type = document_type or _document_type_of(None, version)
+        rule = get_rule_for_type(version.status, to_status, document_type=doc_type)
         if rule is None:
             return False
+        if rule.allowed_roles is not None:
+            return user_has_lifecycle_role(roles, rule.allowed_roles)
         allowed_actions = frozenset().union(
             *(ROLE_WORKFLOW_ACTIONS.get(role, frozenset()) for role in roles)
         )

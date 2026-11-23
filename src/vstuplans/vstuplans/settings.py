@@ -367,6 +367,46 @@ DOCUMENT_TYPES = [
         'file_extensions': ['.plx'],
         'naming_strategy': 'plx',
         'metadata_extractor': 'plx',
+        'companions': [
+            {
+                'code': 'printed_form',
+                'anchor': 'edition',
+                'cardinality': '0..1',
+                'generator': None,
+            },
+        ],
+    },
+    {
+        'code': 'printed_form',
+        'label': 'Печатная форма',
+        'file_extensions': ['.pdf', '.xlsx'],
+        'naming_strategy': 'filename',
+        'metadata_extractor': None,
+        'lifecycle': {
+            'statuses': [
+                {'code': 'new', 'label': 'Черновик'},
+                {'code': 'approved', 'label': 'Утверждён'},
+                {'code': 'trashed', 'label': 'В корзине'},
+            ],
+            'transitions': [
+                {
+                    'action': 'approve',
+                    'label': 'Утвердить',
+                    'from': 'new',
+                    'to': 'approved',
+                    'roles': ['reviewer', 'administrator'],
+                },
+            ],
+            'create_roles': ['reviewer', 'administrator'],
+            'update_roles': ['reviewer', 'administrator'],
+            'view_roles': [
+                'reader',
+                'curriculum_developer',
+                'reviewer',
+                'manager',
+                'administrator',
+            ],
+        },
     },
     {
         'code': 'generic',

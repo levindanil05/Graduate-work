@@ -37,12 +37,18 @@ MEMO_TYPE = {
 
 class DocumentTypeRegistryTests(TestCase):
     def test_default_registry_keeps_plx_and_generic(self):
-        self.assertEqual([spec.code for spec in list_specs()], ['plx', 'generic'])
+        codes = [spec.code for spec in list_specs()]
+        self.assertEqual(codes, ['plx', 'printed_form', 'generic'])
         self.assertEqual(get_spec('plx').naming_strategy, 'plx')
         self.assertEqual(get_spec('plx').metadata_extractor, 'plx')
+        self.assertEqual(len(get_spec('plx').companions), 1)
+        self.assertEqual(get_spec('plx').companions[0].code, 'printed_form')
+        self.assertEqual(get_spec('printed_form').file_extensions, ('.pdf', '.xlsx'))
+        self.assertIsNotNone(get_spec('printed_form').lifecycle)
         self.assertEqual(get_spec('generic').naming_strategy, 'filename')
         self.assertIsNone(get_spec('generic').metadata_extractor)
         self.assertEqual(label_for('plx'), 'Учебный план (PLX)')
+        self.assertEqual(label_for('printed_form'), 'Печатная форма')
 
     def test_unknown_type_is_rejected(self):
         self.assertFalse(is_known('memo'))

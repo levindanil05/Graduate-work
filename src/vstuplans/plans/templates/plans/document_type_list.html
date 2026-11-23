@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ spec.label }}{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title=spec.label %}
+<p class="breadcrumbs">
+    <a href="{% url 'plans:plan_list' %}">Учебные планы</a>
+    · {{ spec.label }}
+</p>
+
+<div class="toolbar">
+    <a class="btn {% if not orphans_only %}btn-primary{% endif %}" href="?">Все</a>
+    <a class="btn {% if orphans_only %}btn-primary{% endif %}" href="?orphans=1">Без главного</a>
+    {% for code, label in type_codes %}
+    <a class="btn btn-muted" href="{% url 'plans:document_type_list' code %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+{% if can_hard_delete and orphans_only %}
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="hard_delete">
+{% endif %}
+
+<table class="data-table">
+    <thead>
+        <tr>
+            {% if can_hard_delete and orphans_only %}<th></th>{% endif %}
+            <th>Имя</th>
+            <th>Статус</th>
+            <th>Относится к</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% if can_hard_delete and orphans_only %}
+            <td><input type="checkbox" name="document_ids" value="{{ row.document.id }}"></td>
+            {% endif %}
+            <td>
+                <a href="{% url 'plans:document_detail' row.document.id %}">{{ row.document.canonical_name }}</a>
+            </td>
+            <td>
+                {% if row.document.current_version %}
+                {{ row.document.current_version.get_status_display }}
+                {% else %}—{% endif %}
+            </td>
+            <td>
+                {% if row.relation %}
+                <a href="{% url 'plans:document_detail' row.relation.target_document_id %}">
+                    {{ row.relation.target_document.canonical_name }}
+                </a>
+                {% if row.relation.target_version %}
+                · редакция {{ row.relation.target_version.version_number }}
+                {% endif %}
+                {% else %}
+                <em>без главного</em>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">{% include "ui/empty_state.html" with message="Документов этого вида пока нет." %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if can_hard_delete and orphans_only and rows %}
+<p style="margin-top:1rem">
+    <button type="submit" class="btn btn-danger" onclick="return confirm('Удалить отмеченные документы безвозвратно?');">
+        Удалить отмеченные
+    </button>
+</p>
+</form>
+{% endif %}
+{% endblock %}

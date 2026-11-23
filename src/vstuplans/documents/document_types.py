@@ -2,6 +2,7 @@
 
 Вид без собственного разбора файла добавляется записью в settings.DOCUMENT_TYPES.
 Ключи naming_strategy и metadata_extractor ссылаются на классы, которые живут в коде.
+Слоты компаньонов и профиль жизненного цикла — поля спецификации вида.
 """
 
 from __future__ import annotations
@@ -26,12 +27,49 @@ class DocumentTypeConfigError(LookupError):
 
 
 @dataclass(frozen=True)
+class CompanionSlot:
+    code: str
+    anchor: str  # 'document' | 'edition'
+    cardinality: str  # '0..1' | '0..n' | '1'
+    generator: str | None = None
+
+
+@dataclass(frozen=True)
 class DocumentTypeSpec:
     code: str
     label: str
     file_extensions: tuple[str, ...]
     naming_strategy: str
     metadata_extractor: str | None = None
+    companions: tuple[CompanionSlot, ...] = ()
+    lifecycle: object | None = None  # LifecycleProfile | None; избегаем цикличного импорта в аннотации
+
+
+PRINTED_FORM_LIFECYCLE = {
+    'statuses': [
+        {'code': 'new', 'label': 'Черновик'},
+        {'code': 'approved', 'label': 'Утверждён'},
+        {'code': 'trashed', 'label': 'В корзине'},
+    ],
+    'transitions': [
+        {
+            'action': 'approve',
+            'label': 'Утвердить',
+            'from': 'new',
+            'to': 'approved',
+            'roles': ['reviewer', 'administrator'],
+        },
+    ],
+    'create_roles': ['reviewer', 'administrator'],
+    'update_roles': ['reviewer', 'administrator'],
+    'view_roles': [
+        'reader',
+        'curriculum_developer',
+        'reviewer',
+        'manager',
+        'administrator',
+    ],
+}
 
 
 DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
@@ -41,6 +79,22 @@ DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
         'file_extensions': ('.plx',),
         'naming_strategy': 'plx',
         'metadata_extractor': 'plx',
+        'companions': (
+            {
+                'code': 'printed_form',
+                'anchor': 'edition',
+                'cardinality': '0..1',
+                'generator': None,
+            },
+        ),
+    },
+    {
+        'code': 'printed_form',
+        'label': 'Печатная форма',
+        'file_extensions': ('.pdf', '.xlsx'),
+        'naming_strategy': 'filename',
+        'metadata_extractor': None,
+        'lifecycle': PRINTED_FORM_LIFECYCLE,
     },
     {
         'code': 'generic',
@@ -50,6 +104,28 @@ DEFAULT_DOCUMENT_TYPES: tuple[dict, ...] = (
         'metadata_extractor': None,
     },
 )
+
+
+def _parse_companions(raw) -> tuple[CompanionSlot, ...]:
+    slots: list[CompanionSlot] = []
+    for item in raw or ():
+        slots.append(
+            CompanionSlot(
+                code=str(item['code']),
+                anchor=str(item.get('anchor') or 'document'),
+                cardinality=str(item.get('cardinality') or '0..n'),
+                generator=(str(item['generator']) if item.get('generator') else None),
+            )
+        )
+    return tuple(slots)
+
+
+def _parse_lifecycle(raw):
+    if not raw:
+        return None
+    from documents.lifecycle import _parse_lifecycle as parse
+
+    return parse(raw)
 
 
 def _raw_config() -> list[dict]:
@@ -70,6 +146,8 @@ def list_specs() -> list[DocumentTypeSpec]:
                 file_extensions=tuple(item.get('file_extensions') or ()),
                 naming_strategy=str(item.get('naming_strategy') or 'filename'),
                 metadata_extractor=str(extractor) if extractor else None,
+                companions=_parse_companions(item.get('companions')),
+                lifecycle=_parse_lifecycle(item.get('lifecycle')),
             )
         )
     return specs
@@ -97,6 +175,20 @@ def label_for(code: str) -> str:
 
 def type_code(document_type: object) -> str:
     return str(document_type)
+
+
+def companion_slots_for(document_type: str) -> tuple[CompanionSlot, ...]:
+    try:
+        return get_spec(document_type).companions
+    except UnknownDocumentType:
+        return ()
+
+
+def slot_for(document_type: str, companion_code: str) -> CompanionSlot | None:
+    for slot in companion_slots_for(document_type):
+        if slot.code == companion_code:
+            return slot
+    return None
 
 
 def validate_document_type(value: str) -> None:

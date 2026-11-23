@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Привязать существующий: {{ slot_label }}{% endblock %}
+
+{% block content %}
+{% include "ui/page_title.html" with title="Привязать существующий" %}
+<p class="breadcrumbs">
+    <a href="{% url 'plans:document_detail' primary.id %}">{{ primary.canonical_name }}</a>
+    · {{ slot_label }}
+</p>
+
+<div class="card">
+    <p>Выберите уже загруженный документ и редакцию плана, к которой его нужно привязать. Новый файл загружать не нужно.</p>
+
+    {% if not existing %}
+    <p>Пока нет документов этого вида, привязанных к плану. Сначала загрузите файл.</p>
+    {% else %}
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="slot" value="{{ slot.code }}">
+        <p>
+            <label for="relation_id">Документ</label><br>
+            <select name="relation_id" id="relation_id" required>
+                {% for rel in existing %}
+                <option value="{{ rel.id }}">
+                    {{ rel.source_document.canonical_name }}
+                    {% if rel.target_version %}(сейчас: редакция {{ rel.target_version.version_number }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>
+            <label for="version_id">Редакция плана</label><br>
+            <select name="version_id" id="version_id" required>
+                {% for edition in editions %}
+                <option value="{{ edition.id }}">
+                    №{{ edition.version_number }} — {{ edition.get_status_display }}
+                    {% if primary.current_version_id == edition.id %}(текущая){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </p>
+        <button type="submit" class="btn btn-primary">Привязать</button>
+        <a class="btn btn-muted" href="{% url 'plans:document_detail' primary.id %}">Отмена</a>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

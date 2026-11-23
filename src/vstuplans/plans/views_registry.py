@@ -98,7 +98,7 @@ def trash_list(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@require_http_methods(['POST'])
+@require_http_methods(['GET', 'POST'])
 def hard_delete_document(request: HttpRequest, document_id) -> HttpResponse:
     if not user_can_hard_delete(request.user.pk):
         messages.error(request, 'Недостаточно прав для физического удаления.')
@@ -110,9 +110,25 @@ def hard_delete_document(request: HttpRequest, document_id) -> HttpResponse:
         messages.error(request, 'Удалить можно только документ, целиком находящийся в корзине.')
         return redirect('plans:trash_list')
 
+    from documents.relations import direct_dependents
+
+    dependents = direct_dependents(document)
+
+    if request.method == 'GET':
+        return render(
+            request,
+            'plans/hard_delete_confirm.html',
+            {'document': document, 'dependents': dependents},
+        )
+
+    delete_dependents = request.POST.get('delete_dependents') == '1'
     service = build_document_service()
     try:
-        service.hard_delete_document(document_id=document.pk, actor_user_id=request.user.pk)
+        service.hard_delete_document(
+            document_id=document.pk,
+            actor_user_id=request.user.pk,
+            delete_dependents=delete_dependents,
+        )
         messages.success(request, 'Документ и файлы удалены безвозвратно.')
     except DomainValidationError as exc:
         messages.error(request, str(exc))

@@ -7,7 +7,11 @@
 {% block content %}
 {% include "ui/page_title.html" with title=display_name %}
 <p class="breadcrumbs">
+    {% if document.document_type == 'plx' %}
     <a href="{% url 'plans:plan_list' %}">Учебные планы</a>
+    {% else %}
+    <a href="{% url 'plans:document_type_list' document.document_type %}">{{ document.get_document_type_display }}</a>
+    {% endif %}
     · {{ display_name }}
 </p>
 
@@ -19,12 +23,28 @@
     {% endif %}
 </div>
 
+{% if related_to %}
+<p class="related-to">
+    Относится к:
+    <a href="{% url 'plans:document_detail' related_to.target_document_id %}">
+        {{ related_to.target_document.canonical_name }}
+    </a>
+    {% if related_to.target_version %}
+    · редакция {{ related_to.target_version.version_number }}
+    {% endif %}
+    · <a href="{% url 'plans:document_type_list' document.document_type %}">Все документы этого вида</a>
+</p>
+{% endif %}
+
 <nav class="tabs" aria-label="Разделы документа">
     <a href="?tab=status" class="{% if tab == 'status' %}active{% endif %}">Статус</a>
     <a href="?tab=versions" class="{% if tab == 'versions' %}active{% endif %}">Редакции</a>
     <a href="?tab=workflow" class="{% if tab == 'workflow' %}active{% endif %}">Рабочий процесс</a>
     <a href="?tab=discussion" class="{% if tab == 'discussion' %}active{% endif %}">Обсуждение</a>
     <a href="?tab=metadata" class="{% if tab == 'metadata' %}active{% endif %}">Реквизиты плана</a>
+    {% if companion_slots %}
+    <a href="?tab=companions" class="{% if tab == 'companions' %}active{% endif %}">Связанные документы</a>
+    {% endif %}
     {% if show_external_replicas %}
     <a href="?tab=external" class="{% if tab == 'external' %}active{% endif %}">Резервные копии</a>
     {% endif %}
@@ -45,7 +65,11 @@
     {% if current_version %}
     <a class="btn" href="{{ current_download_href }}">Скачать актуальную</a>
     {% if can_upload %}
-    <a class="btn" href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую редакцию</a>
+      {% if document.document_type == 'plx' %}
+      <a class="btn" href="{% url 'plans:upload_plx' %}?document_id={{ document.id }}">Загрузить новую редакцию</a>
+      {% else %}
+      <a class="btn" href="{% url 'plans:upload_companion_version' document.id %}">Загрузить новую редакцию</a>
+      {% endif %}
     {% endif %}
     {% if transition_choices %}
     <a class="btn btn-primary" href="{% url 'plans:transition_status' document.id %}">Изменить статус</a>
@@ -60,10 +84,7 @@
     {% if current_version.status == 'trashed' %}
     <a class="btn btn-ghost" href="{% url 'plans:trash_list' %}">Открыть корзину</a>
     {% if can_hard_delete %}
-    <form method="post" action="{% url 'plans:hard_delete_document' document.id %}" class="inline-form" onsubmit="return confirm('Удалить документ и файлы безвозвратно? Это действие нельзя отменить.');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Удалить безвозвратно</button>
-    </form>
+    <a class="btn btn-danger" href="{% url 'plans:hard_delete_document' document.id %}">Удалить безвозвратно</a>
     {% endif %}
     {% endif %}
     <a class="btn btn-muted" href="{% feedback_create_url document.id %}">Сообщить о проблеме</a>
@@ -210,6 +231,75 @@
 {% else %}
 <p>Резервных копий пока нет.</p>
 {% endif %}
+
+{% elif tab == 'companions' %}
+{% for slot_row in companion_slots %}
+<section class="card" style="margin-bottom:1rem">
+    <h2>{{ slot_row.label }}</h2>
+    {% if slot_row.relations %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Документ</th>
+                <th>Редакция плана</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for view in slot_row.relations %}
+            <tr>
+                <td>
+                    <a href="{% url 'plans:document_detail' view.companion.id %}">
+                        {{ view.companion.canonical_name }}
+                    </a>
+                </td>
+                <td>
+                    {% if view.relation.target_version %}
+                    №{{ view.relation.target_version.version_number }}
+                    {% else %}
+                    весь документ
+                    {% endif %}
+                </td>
+                <td>
+                    {% if view.companion.current_version %}
+                    {{ view.companion.current_version.get_status_display }}
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if slot_row.can_view and view.companion.current_version %}
+                    <a href="{% url 'plans:download_current' view.companion.id %}">Скачать</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>Пока нет привязанных документов.</p>
+    {% endif %}
+    <div class="toolbar">
+        {% if slot_row.can_create %}
+        <a class="btn btn-primary"
+           href="{% url 'plans:upload_companion' document.id %}?slot={{ slot_row.slot.code }}{% if current_version %}&version_id={{ current_version.id }}{% endif %}">
+            Загрузить
+        </a>
+        {% endif %}
+        {% if slot_row.can_update and slot_row.slot.anchor == 'edition' %}
+        <a class="btn" href="{% url 'plans:rebind_companion' document.id %}?slot={{ slot_row.slot.code }}">
+            Привязать существующий
+        </a>
+        {% endif %}
+        {% if slot_row.can_view %}
+        <a class="btn btn-muted" href="{% url 'plans:document_type_list' slot_row.slot.code %}">
+            Все «{{ slot_row.label }}»
+        </a>
+        {% endif %}
+    </div>
+</section>
+{% empty %}
+<p>Для этого вида документов связанные слоты не настроены.</p>
+{% endfor %}
 
 {% elif tab == 'metadata' %}
 {% if current_version %}

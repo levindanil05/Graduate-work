@@ -9,6 +9,7 @@ from .models import (
     DiscussionThread,
     Document,
     DocumentAlias,
+    DocumentRelation,
     DocumentTypeStrategy,
     DocumentVersion,
     WorkflowTransition,
@@ -76,6 +77,23 @@ admin.site.register(DiscussionThread)
 admin.site.register(DiscussionMessage)
 admin.site.register(WorkflowTransition)
 admin.site.register(DocumentTypeStrategy)
+
+
+@admin.register(DocumentRelation)
+class DocumentRelationAdmin(admin.ModelAdmin):
+    list_display = (
+        'slot_code',
+        'source_document',
+        'target_document',
+        'target_version',
+        'is_current',
+        'updated_at',
+    )
+    list_filter = ('slot_code', 'is_current')
+    search_fields = (
+        'source_document__canonical_name',
+        'target_document__canonical_name',
+    )
 
 
 @admin.register(ActionLog)

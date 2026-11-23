@@ -29,7 +29,7 @@ from .entities import (
     WorkflowAction,
     WorkflowTransition,
 )
-from .workflow_rules import get_rule
+from .lifecycle import get_rule_for_type
 
 SYNC_ACTOR_USER_ID = 0
 
@@ -227,6 +227,18 @@ class DocumentApplicationService:
 
     def upload_new_document(self, request: UploadRequest) -> UploadResult:
         """Create new document when no matching chain is confirmed."""
+        from accounts.permissions import user_can_create_of_type
+        from accounts.roles import ROLE_CAN_UPLOAD, Role
+        from accounts.permissions import user_roles
+
+        doc_type = str(request.document_type)
+        if doc_type == 'plx':
+            roles = user_roles(request.user_id)
+            if not (roles & ROLE_CAN_UPLOAD) and Role.ADMINISTRATOR not in roles:
+                raise DomainValidationError(_('Upload is not allowed for the current user'))
+        elif not user_can_create_of_type(request.user_id, doc_type):
+            raise DomainValidationError(_('Upload is not allowed for the current user'))
+
         strategy = self._resolve_naming_strategy(request.document_type)
         canonical_name = strategy.canonicalize(request.source_filename)
         aliases = set(strategy.build_aliases(request.source_filename))
@@ -599,16 +611,19 @@ class DocumentApplicationService:
         if document is None:
             raise DomainValidationError(_('Parent document not found'))
 
-        if not self.permissions.can_transition(actor_user_id, version, target_status):
+        doc_type = str(document.document_type)
+        if not self.permissions.can_transition(
+            actor_user_id, version, target_status, document_type=doc_type
+        ):
             raise DomainValidationError(_('User cannot perform this transition'))
 
-        rule = get_rule(version.status, target_status)
+        rule = get_rule_for_type(version.status, target_status, document_type=doc_type)
         if rule is None:
             raise DomainValidationError(
                 _('Transition %(from_status)s → %(to_status)s is not allowed')
                 % {
-                    'from_status': target_status_label(version.status),
-                    'to_status': target_status_label(target_status),
+                    'from_status': target_status_label(version.status, document_type=doc_type),
+                    'to_status': target_status_label(target_status, document_type=doc_type),
                 }
             )
 
@@ -974,10 +989,21 @@ class DocumentApplicationService:
         self.workflow.save_transition(transition)
         return saved
 
-    def hard_delete_document(self, *, document_id: UUID, actor_user_id: int) -> None:
-        """Безвозвратное удаление документа, редакций и файлов в USERFILES_ROOT."""
+    def hard_delete_document(
+        self,
+        *,
+        document_id: UUID,
+        actor_user_id: int,
+        delete_dependents: bool = False,
+    ) -> None:
+        """Безвозвратное удаление документа, редакций и файлов в USERFILES_ROOT.
+
+        По умолчанию связи с компаньонами снимаются, сами компаньоны остаются.
+        При delete_dependents=True удаляются прямые зависимые, если есть право.
+        """
         from documents import models as orm
         from documents.audit import log_action
+        from documents.relations import detach_all_from_primary, direct_dependents
 
         document = self.documents.get(document_id)
         if document is None:
@@ -989,6 +1015,23 @@ class DocumentApplicationService:
         record = orm.Document.objects.filter(pk=document_id).prefetch_related('versions').first()
         if record is None:
             raise DomainValidationError(_('Document not found'))
+
+        dependents = direct_dependents(record)
+        if delete_dependents:
+            for dep in dependents:
+                if not self.permissions.can_hard_delete(actor_user_id, dep):
+                    raise DomainValidationError(
+                        _('Недостаточно прав, чтобы удалить зависимый документ «%(name)s»')
+                        % {'name': dep.canonical_name}
+                    )
+            for dep in dependents:
+                self.hard_delete_document(
+                    document_id=dep.id,
+                    actor_user_id=actor_user_id,
+                    delete_dependents=False,
+                )
+        else:
+            detach_all_from_primary(record)
 
         storage_keys = [v.storage_key for v in record.versions.all() if v.storage_key]
         canonical = record.canonical_name
@@ -1015,5 +1058,9 @@ class DocumentApplicationService:
             actor=actor,
             object_type='document',
             object_id=record_id,
-            metadata={'canonical_name': canonical, 'storage_keys': storage_keys},
+            metadata={
+                'canonical_name': canonical,
+                'storage_keys': storage_keys,
+                'delete_dependents': delete_dependents,
+            },
         )

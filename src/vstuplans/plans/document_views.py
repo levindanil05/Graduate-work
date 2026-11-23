@@ -10,7 +10,11 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import user_can_edit_document, user_can_upload
-from accounts.permissions import user_can_hard_delete
+from accounts.permissions import (
+    user_can_hard_delete,
+    user_can_update_of_type,
+    user_can_view_of_type,
+)
 from documents.entities import DocumentVersion as DomainVersion
 from documents.entities import VersionStatus
 from documents.factory import build_document_service
@@ -87,15 +91,24 @@ def _domain_version_stub(orm_version: DocumentVersion) -> DomainVersion:
     )
 
 
-def _transitions_for_request(request: HttpRequest, current: DocumentVersion | None):
+def _transitions_for_request(
+    request: HttpRequest,
+    current: DocumentVersion | None,
+    *,
+    document_type: str | None = None,
+):
     if current is None or not request.user.is_authenticated:
         return []
     rules = list_allowed_transitions_for_user(
         current.status,
         user_id=request.user.pk,
         version=_domain_version_stub(current),
+        document_type=document_type,
     )
-    return [(rule, transition_label(rule)) for rule in rules]
+    return [
+        (rule, transition_label(rule, document_type=document_type))
+        for rule in rules
+    ]
 
 
 def _direct_download_urls_for_document(
@@ -144,9 +157,19 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
     document = _get_document(document_id)
     current = document.current_version
     can_edit = user_can_edit_document(request)
-    can_upload = user_can_upload(request)
+    if document.document_type == 'plx':
+        can_upload = user_can_upload(request)
+    else:
+        can_upload = user_can_update_of_type(request.user.pk, document.document_type)
+    can_view = user_can_view_of_type(request.user.pk, document.document_type)
+    if not can_view:
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied('Недостаточно прав для просмотра этого документа')
     can_hard_delete = user_can_hard_delete(request.user.pk if request.user.is_authenticated else None)
-    transition_choices = _transitions_for_request(request, current)
+    transition_choices = _transitions_for_request(
+        request, current, document_type=document.document_type
+    )
     open_name_editor = request.GET.get('edit_name') == '1'
     naming_values = naming_values_from_meta(
         (current.extracted_metadata if current else None) or {}
@@ -229,6 +252,10 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         'discussion',
         'metadata',
     }
+    from documents.document_types import companion_slots_for
+
+    if companion_slots_for(document.document_type):
+        allowed_tabs.add('companions')
     if show_external:
         allowed_tabs.add('external')
     if tab not in allowed_tabs:
@@ -286,6 +313,12 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
         )
         version_rows.append({'version': version, 'download_href': href})
 
+    from plans.companion_views import companion_slots_context
+    from documents.relations import current_relation_for_companion
+
+    companion_slots = companion_slots_context(document, request.user.pk)
+    related_to = current_relation_for_companion(document)
+
     return render(
         request,
         'plans/document_detail.html',
@@ -310,6 +343,8 @@ def document_detail(request: HttpRequest, document_id: UUID) -> HttpResponse:
             'can_upload': can_upload,
             'can_hard_delete': can_hard_delete,
             'current_download_href': current_download_href,
+            'companion_slots': companion_slots,
+            'related_to': related_to,
             'process_diagram': process_diagram_context(
                 current_status=current.status if current else None,
                 include_transitions=False,
@@ -327,13 +362,19 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
         raise Http404('У документа нет текущей редакции')
 
     domain_version = _domain_version_stub(current)
+    doc_type = document.document_type
     allowed = list_allowed_transitions_for_user(
         current.status,
         user_id=request.user.pk,
         version=domain_version,
+        document_type=doc_type,
     )
     transition_choices = [
-        (rule, transition_label(rule), target_status_label(rule.to_status))
+        (
+            rule,
+            transition_label(rule, document_type=doc_type),
+            target_status_label(rule.to_status, document_type=doc_type),
+        )
         for rule in allowed
     ]
     next_url = request.GET.get('next') or request.POST.get('next') or ''
@@ -354,7 +395,9 @@ def transition_status(request: HttpRequest, document_id: UUID) -> HttpResponse:
             )
             messages.success(
                 request,
-                f'Статус изменён: {target_status_label(current.status)} → {target_status_label(target)}',
+                f'Статус изменён: '
+                f'{target_status_label(current.status, document_type=doc_type)} → '
+                f'{target_status_label(target, document_type=doc_type)}',
             )
             if next_url.startswith('/'):
                 return redirect(next_url)

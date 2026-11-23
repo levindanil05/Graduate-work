@@ -10,7 +10,11 @@ class AllowAllPermissionService:
         return True
 
     def can_transition(
-        self, user_id: int, version: DocumentVersion, to_status: VersionStatus
+        self,
+        user_id: int,
+        version: DocumentVersion,
+        to_status: VersionStatus,
+        **kwargs,
     ) -> bool:
         return True
 
